@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
-import { Sparkles, Bell } from 'lucide-vue-next'
+import { Bell } from 'lucide-vue-next'
 import { useUserStore } from '@/stores/user'
 import { cn } from '@/lib/utils'
+import logoUrl from '@/assets/logo.png'
 
 const scrolled = ref(false)
 const onScroll = () => {
@@ -42,11 +43,11 @@ const headerClass = computed(() =>
         to="/"
         class="flex items-center gap-2 text-moon-50 hover:text-electric-400 transition-colors"
       >
-        <span
-          class="grid h-9 w-9 place-items-center rounded-md border border-electric-400/40 bg-electric-400/10 shadow-glow-sm"
-        >
-          <Sparkles class="h-5 w-5 text-electric-400" />
-        </span>
+        <img
+          :src="logoUrl"
+          alt="MindMapVideo"
+          class="h-9 w-9 rounded-md object-contain"
+        />
         <span class="font-display text-lg font-semibold tracking-tight"
           >MindMap<span class="text-electric-400">Video</span></span
         >

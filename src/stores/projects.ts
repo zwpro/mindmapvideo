@@ -1,58 +1,20 @@
 import { defineStore } from 'pinia'
-import { nanoid } from 'nanoid'
 import type { OutlineNode, Project, ProjectStatus, Scene, VideoConfig } from '@/types'
-import { DEFAULT_VIDEO_CONFIG } from '@/lib/constants'
+import { projectApi } from '@/lib/api'
 
 interface State {
   projects: Project[]
+  loading: boolean
+  loaded: boolean
+  error: string | null
 }
-
-const seed: Project[] = [
-  {
-    id: 'proj-demo-1',
-    userId: 'admin',
-    topic: '人工智能发展史',
-    status: 'completed',
-    thumbnailUrl:
-      'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=futuristic%20mindmap%20visualization%20about%20artificial%20intelligence%20history%2C%20deep%20navy%20background%2C%20cyan%20neon%20nodes%2C%20glowing%20connections&image_size=landscape_16_9',
-    outline: null,
-    scenes: null,
-    config: { ...DEFAULT_VIDEO_CONFIG },
-    videoId: 'video-demo-1',
-    createdAt: new Date(Date.now() - 86_400_000 * 3).toISOString(),
-    updatedAt: new Date(Date.now() - 86_400_000 * 1).toISOString(),
-  },
-  {
-    id: 'proj-demo-2',
-    userId: 'admin',
-    topic: 'Python 入门学习路线',
-    status: 'draft',
-    thumbnailUrl:
-      'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=mindmap%20diagram%20about%20python%20learning%20roadmap%2C%20dark%20theme%2C%20mint%20green%20highlights%2C%20clean%20typography&image_size=landscape_16_9',
-    outline: null,
-    scenes: null,
-    config: { ...DEFAULT_VIDEO_CONFIG },
-    createdAt: new Date(Date.now() - 86_400_000 * 5).toISOString(),
-    updatedAt: new Date(Date.now() - 86_400_000 * 2).toISOString(),
-  },
-  {
-    id: 'proj-demo-3',
-    userId: 'admin',
-    topic: '区块链基础原理',
-    status: 'generating',
-    thumbnailUrl:
-      'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=abstract%20blockchain%20mindmap%20concept%20art%2C%20glowing%20chain%20links%2C%20cyberpunk%20palette%2C%20cinematic%20lighting&image_size=landscape_16_9',
-    outline: null,
-    scenes: null,
-    config: { ...DEFAULT_VIDEO_CONFIG },
-    createdAt: new Date(Date.now() - 86_400_000 * 1).toISOString(),
-    updatedAt: new Date(Date.now() - 3_600_000).toISOString(),
-  },
-]
 
 export const useProjectStore = defineStore('projects', {
   state: (): State => ({
-    projects: seed,
+    projects: [],
+    loading: false,
+    loaded: false,
+    error: null,
   }),
   getters: {
     byId: (s) => (id: string) => s.projects.find((p) => p.id === id) || null,
@@ -70,54 +32,64 @@ export const useProjectStore = defineStore('projects', {
     }),
   },
   actions: {
-    create(topic: string): Project {
-      const id = `proj-${nanoid(8)}`
-      const now = new Date().toISOString()
-      const project: Project = {
-        id,
-        userId: 'admin',
-        topic,
-        status: 'draft',
-        thumbnailUrl: thumbnailFor(topic),
-        outline: null,
-        scenes: null,
-        config: { ...DEFAULT_VIDEO_CONFIG },
-        createdAt: now,
-        updatedAt: now,
+    upsert(project: Project) {
+      const idx = this.projects.findIndex((p) => p.id === project.id)
+      if (idx >= 0) this.projects.splice(idx, 1, project)
+      else this.projects.unshift(project)
+    },
+
+    async fetchList(force = false): Promise<Project[]> {
+      if (this.loaded && !force) return this.projects
+      this.loading = true
+      this.error = null
+      try {
+        const list = await projectApi.list()
+        this.projects = list
+        this.loaded = true
+        return list
+      } catch (err) {
+        this.error = (err as Error).message
+        throw err
+      } finally {
+        this.loading = false
       }
-      this.projects.unshift(project)
+    },
+
+    async fetchOne(id: string): Promise<Project> {
+      const project = await projectApi.get(id)
+      this.upsert(project)
       return project
     },
-    update(id: string, patch: Partial<Project>) {
-      const target = this.projects.find((p) => p.id === id)
-      if (!target) return
-      Object.assign(target, patch, { updatedAt: new Date().toISOString() })
+
+    async create(topic: string): Promise<Project> {
+      const project = await projectApi.create({ topic })
+      this.upsert(project)
+      return project
     },
+
+    async update(id: string, patch: Partial<Project>): Promise<Project> {
+      const project = await projectApi.update(id, patch)
+      this.upsert(project)
+      return project
+    },
+
     setOutline(id: string, outline: OutlineNode) {
-      this.update(id, { outline })
+      return this.update(id, { outline })
     },
     setScenes(id: string, scenes: Scene[]) {
-      this.update(id, { scenes })
+      return this.update(id, { scenes })
     },
     setConfig(id: string, config: VideoConfig) {
-      this.update(id, { config })
+      return this.update(id, { config })
     },
     setStatus(id: string, status: ProjectStatus) {
-      this.update(id, { status })
+      return this.update(id, { status })
     },
-    remove(id: string) {
+
+    async remove(id: string): Promise<void> {
+      await projectApi.delete(id)
       const idx = this.projects.findIndex((p) => p.id === id)
       if (idx >= 0) this.projects.splice(idx, 1)
     },
   },
-  persist: {
-    key: 'mindmap.projects',
-  },
 })
-
-function thumbnailFor(topic: string): string {
-  const prompt = encodeURIComponent(
-    `mindmap concept illustration about ${topic}, deep navy background, cyan and orange neon highlights, glowing nodes connected by curves`,
-  )
-  return `https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=${prompt}&image_size=landscape_16_9`
-}

@@ -11,9 +11,9 @@ router = APIRouter()
 @router.get(
     "",
     response_model=list[Scene],
-    summary="按主题一次性生成分镜列表",
+    summary="按主题生成分镜列表（优先 LLM，失败回退模板）",
 )
 async def generate_scenes(
     topic: str = Query(..., min_length=1, description="主题文本"),
 ) -> list[Scene]:
-    return outline_service.generate_scenes_sync(topic)
+    return await outline_service.generate_scenes(topic)

@@ -1,4 +1,8 @@
-"""SQLAlchemy 异步会话与 ORM 基类（占位）。"""
+"""SQLAlchemy 异步会话与 ORM 基类。"""
+
+from __future__ import annotations
+
+from collections.abc import AsyncIterator
 
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -18,6 +22,7 @@ engine = create_async_engine(settings.DATABASE_URL, echo=settings.APP_DEBUG)
 SessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
-async def get_db() -> AsyncSession:
+async def get_db() -> AsyncIterator[AsyncSession]:
+    """FastAPI 依赖：每个请求一个 AsyncSession，结束后自动关闭。"""
     async with SessionLocal() as session:
         yield session

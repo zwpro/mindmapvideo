@@ -1,29 +1,22 @@
 import { defineStore } from 'pinia'
 import type { GenerationStage, VideoDetail, VideoTask } from '@/types'
+import { videoApi } from '@/lib/api'
 
 interface State {
   tasks: Record<string, VideoTask>
   videos: Record<string, VideoDetail>
+  loadingTask: Record<string, boolean>
+  loadingVideo: Record<string, boolean>
+  error: string | null
 }
 
 export const useTaskStore = defineStore('tasks', {
   state: (): State => ({
     tasks: {},
-    videos: {
-      'video-demo-1': {
-        id: 'video-demo-1',
-        projectId: 'proj-demo-1',
-        taskId: 'task-demo-1',
-        url: 'https://www.w3schools.com/html/mov_bbb.mp4',
-        thumbnailUrl:
-          'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=cinematic%20mindmap%20video%20thumbnail%2C%20deep%20navy%20background%2C%20cyan%20neon%20mindmap%20nodes%2C%20premium%20look&image_size=landscape_16_9',
-        duration: 184,
-        resolution: '1080p',
-        ratio: '16:9',
-        fileSize: 28_600_000,
-        createdAt: new Date(Date.now() - 86_400_000).toISOString(),
-      },
-    },
+    videos: {},
+    loadingTask: {},
+    loadingVideo: {},
+    error: null,
   }),
   getters: {
     taskById: (s) => (id: string) => s.tasks[id] || null,
@@ -45,8 +38,39 @@ export const useTaskStore = defineStore('tasks', {
     addVideo(detail: VideoDetail) {
       this.videos[detail.id] = detail
     },
-  },
-  persist: {
-    key: 'mindmap.tasks',
+    async fetchTask(taskId: string): Promise<VideoTask> {
+      this.loadingTask[taskId] = true
+      this.error = null
+      try {
+        const task = await videoApi.getTask(taskId)
+        this.upsert(task)
+        return task
+      } catch (err) {
+        this.error = err instanceof Error ? err.message : '获取任务失败'
+        throw err
+      } finally {
+        this.loadingTask[taskId] = false
+      }
+    },
+    async fetchVideo(videoId: string): Promise<VideoDetail> {
+      this.loadingVideo[videoId] = true
+      this.error = null
+      try {
+        const detail = await videoApi.getDetail(videoId)
+        this.addVideo(detail)
+        return detail
+      } catch (err) {
+        this.error = err instanceof Error ? err.message : '获取视频失败'
+        throw err
+      } finally {
+        this.loadingVideo[videoId] = false
+      }
+    },
+    async createTask(projectId: string): Promise<VideoTask> {
+      this.error = null
+      const task = await videoApi.createTask(projectId)
+      this.upsert(task)
+      return task
+    },
   },
 })

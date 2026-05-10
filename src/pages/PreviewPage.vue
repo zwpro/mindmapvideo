@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowLeft, Download, Share2, Sparkles, RotateCcw, Film } from 'lucide-vue-next'
 import PageShell from '@/components/layout/PageShell.vue'
@@ -19,6 +19,24 @@ const video = computed(() => taskStore.videoById(props.videoId))
 const project = computed(() =>
   video.value ? projectStore.byId(video.value.projectId) : null,
 )
+
+const loading = ref(true)
+const loadError = ref<string | null>(null)
+
+onMounted(async () => {
+  loading.value = true
+  loadError.value = null
+  try {
+    const detail = await taskStore.fetchVideo(props.videoId)
+    if (!projectStore.byId(detail.projectId)) {
+      await projectStore.fetchOne(detail.projectId).catch(() => undefined)
+    }
+  } catch (err) {
+    loadError.value = err instanceof Error ? err.message : '加载视频失败'
+  } finally {
+    loading.value = false
+  }
+})
 
 const copied = ref(false)
 const share = async () => {
@@ -56,9 +74,13 @@ const regenerate = () => {
         返回工作台
       </button>
 
-      <div v-if="!video" class="text-center py-24">
+      <div v-if="loading" class="text-center py-24 text-mist-400 text-sm">
+        正在加载视频…
+      </div>
+
+      <div v-else-if="!video" class="text-center py-24">
         <Film class="h-12 w-12 text-mist-500 mx-auto mb-4" />
-        <p class="text-mist-400">视频不存在或已被删除</p>
+        <p class="text-mist-400">{{ loadError || '视频不存在或已被删除' }}</p>
         <AppButton class="mt-6" variant="secondary" @click="router.push({ name: 'dashboard' })">
           返回工作台
         </AppButton>

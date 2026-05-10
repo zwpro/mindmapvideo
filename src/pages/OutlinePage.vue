@@ -19,7 +19,7 @@ import AppCard from '@/components/ui/AppCard.vue'
 import AppInput from '@/components/ui/AppInput.vue'
 import AppStepper from '@/components/ui/AppStepper.vue'
 import { useProjectStore } from '@/stores/projects'
-import { streamScenes, type StreamHandle } from '@/services/outlineMock'
+import { sceneApi } from '@/lib/api'
 import type { Scene } from '@/types'
 
 const route = useRoute()
@@ -32,7 +32,6 @@ const project = computed(() => projects.byId(projectId.value))
 const scenes = ref<Scene[]>([])
 const streaming = ref(false)
 const selectedId = ref<string | null>(null)
-const stream = ref<StreamHandle | null>(null)
 
 const STEPS = [
   { key: 'outline', label: '大纲生成' },
@@ -76,25 +75,22 @@ const persist = () => {
   }
 }
 
-const startStream = () => {
+const startStream = async () => {
   if (!project.value) return
   scenes.value = []
   streaming.value = true
   selectedId.value = null
-  stream.value?.cancel()
-  stream.value = streamScenes(project.value.topic, (chunk) => {
-    if (chunk.type === 'scene' && chunk.scene) {
-      scenes.value.push({ ...chunk.scene })
-      if (selectedId.value === null) {
-        selectedId.value = chunk.scene.id
-      }
-    }
-    if (chunk.type === 'done') {
-      streaming.value = false
-      reindex()
-      persist()
-    }
-  })
+  try {
+    const list = await sceneApi.generateScenes(project.value.topic)
+    scenes.value = list.map((s) => ({ ...s }))
+    selectedId.value = scenes.value[0]?.id ?? null
+    reindex()
+    persist()
+  } catch (err) {
+    console.error('[OutlinePage] generateScenes failed', err)
+  } finally {
+    streaming.value = false
+  }
 }
 
 const regenerate = () => {
@@ -169,7 +165,15 @@ const goNext = () => {
   router.push({ name: 'config', params: { projectId: projectId.value } })
 }
 
-onMounted(() => {
+onMounted(async () => {
+  if (!project.value) {
+    try {
+      await projects.fetchOne(projectId.value)
+    } catch {
+      router.replace({ name: 'home' })
+      return
+    }
+  }
   if (!project.value) {
     router.replace({ name: 'home' })
     return
@@ -183,7 +187,6 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  stream.value?.cancel()
   if (saveTimer) clearTimeout(saveTimer)
 })
 </script>
@@ -314,7 +317,7 @@ onUnmounted(() => {
               v-if="streaming"
               class="rounded-xl border border-dashed border-electric-400/40 bg-indigo-50/50 p-3 text-center text-xs text-electric-400"
             >
-              正在流式生成分镜…
+              正在生成分镜…
             </div>
 
             <div

@@ -61,7 +61,7 @@ const onKey = (e: KeyboardEvent) => {
       :value="modelValue"
       :placeholder="placeholder"
       :disabled="disabled"
-      class="w-full bg-transparent text-moon-50 placeholder:text-mist-400 outline-none disabled:cursor-not-allowed"
+      class="w-full min-w-0 bg-transparent text-moon-50 placeholder:text-mist-400 outline-none disabled:cursor-not-allowed"
       @input="onInput"
       @keydown="onKey"
     />

@@ -18,7 +18,7 @@ import AppStepper from '@/components/ui/AppStepper.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import { useProjectStore } from '@/stores/projects'
 import { useTaskStore } from '@/stores/tasks'
-import { startVideoGeneration } from '@/services/videoMock'
+import { useUserStore } from '@/stores/user'
 import {
   ANIMATION_STYLES,
   BGM_OPTIONS,
@@ -34,6 +34,7 @@ const route = useRoute()
 const router = useRouter()
 const projects = useProjectStore()
 const tasks = useTaskStore()
+const user = useUserStore()
 
 const projectId = computed(() => route.params.projectId as string)
 const project = computed(() => projects.byId(projectId.value))
@@ -76,32 +77,39 @@ const estimatedDuration = computed(() => {
   return `${m}:${String(s).padStart(2, '0')}`
 })
 
-const submit = () => {
+const submit = async () => {
   if (!project.value) return
-  projects.setConfig(projectId.value, JSON.parse(JSON.stringify(config)))
-  projects.setStatus(projectId.value, 'generating')
+  try {
+    await projects.setConfig(projectId.value, JSON.parse(JSON.stringify(config)))
+    await projects.setStatus(projectId.value, 'generating')
 
-  const handle = startVideoGeneration({
-    project: { ...project.value, config: { ...config } },
-    onTaskCreated: (task) => {
-      tasks.upsert(task)
-      projects.update(projectId.value, { taskId: task.id })
-    },
-    onEvent: (event) => {
-      const taskId = project.value?.taskId
-      if (!taskId) return
-      tasks.setProgress(taskId, event.stage, event.progress)
-    },
-    onComplete: (video) => {
-      tasks.addVideo(video)
-      projects.update(projectId.value, {
+    const task = await tasks.createTask(projectId.value)
+    await projects.update(projectId.value, { taskId: task.id })
+
+    if (task.videoId) {
+      const video = await tasks.fetchVideo(task.videoId)
+      await projects.update(projectId.value, {
         videoId: video.id,
         status: 'completed',
       })
-    },
-  })
+    }
 
-  router.push({ name: 'progress', params: { taskId: handle.taskId } })
+    user.pushNotification({
+      title: '视频生成已启动',
+      body: `主题「${project.value.topic}」已进入生成队列`,
+      level: 'info',
+    })
+
+    router.push({ name: 'progress', params: { taskId: task.id } })
+  } catch (err) {
+    console.error('[ConfigPage] createTask failed', err)
+    await projects.setStatus(projectId.value, 'failed').catch(() => undefined)
+    user.pushNotification({
+      title: '视频生成失败',
+      body: err instanceof Error ? err.message : '未知错误',
+      level: 'warning',
+    })
+  }
 }
 
 const setBgm = (id: string) => {
@@ -114,7 +122,15 @@ const setBgm = (id: string) => {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
+  if (!project.value) {
+    try {
+      await projects.fetchOne(projectId.value)
+    } catch {
+      router.replace({ name: 'dashboard' })
+      return
+    }
+  }
   if (!project.value) {
     router.replace({ name: 'dashboard' })
     return

@@ -7,6 +7,7 @@
 3. 在 app/db/base.py 里 import,让 Alembic autogenerate 能发现
 """
 
+from app.db.models.notification import NotificationORM
 from app.db.models.project import ProjectORM
 from app.db.models.scene import SceneORM
 from app.db.models.user import UserORM
@@ -14,6 +15,7 @@ from app.db.models.video_detail import VideoDetailORM
 from app.db.models.video_task import VideoTaskORM
 
 __all__ = [
+    "NotificationORM",
     "ProjectORM",
     "SceneORM",
     "UserORM",

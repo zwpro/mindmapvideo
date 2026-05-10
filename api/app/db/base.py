@@ -10,6 +10,7 @@ from app.db.session import Base  # noqa: F401
 
 # 所有 ORM 模型必须在此处 import,Alembic 才能在 autogenerate 时看到。
 from app.db.models import (  # noqa: F401
+    NotificationORM,
     ProjectORM,
     SceneORM,
     UserORM,

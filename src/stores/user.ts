@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia'
 import type { AdminUser, AppNotification } from '@/types'
+import { userApi, type CreateNotificationPayload, type UpdateUserPayload } from '@/lib/api'
 
-const ADMIN: AdminUser = {
+const FALLBACK_USER: AdminUser = {
   id: 'admin',
   nickname: 'Admin',
   avatarUrl:
@@ -10,33 +11,65 @@ const ADMIN: AdminUser = {
   role: 'admin',
 }
 
+interface State {
+  user: AdminUser
+  notifications: AppNotification[]
+  loaded: boolean
+  loading: boolean
+  error: string | null
+}
+
 export const useUserStore = defineStore('user', {
-  state: () => ({
-    user: ADMIN as AdminUser,
-    notifications: [] as AppNotification[],
+  state: (): State => ({
+    user: FALLBACK_USER,
+    notifications: [],
+    loaded: false,
+    loading: false,
+    error: null,
   }),
   getters: {
     unreadCount: (s) => s.notifications.filter((n) => !n.read).length,
   },
   actions: {
-    pushNotification(payload: Omit<AppNotification, 'id' | 'read' | 'createdAt'>) {
-      const id = `n-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-      this.notifications.unshift({
-        id,
-        read: false,
-        createdAt: new Date().toISOString(),
-        ...payload,
-      })
+    async fetchMe(force = false): Promise<AdminUser> {
+      if (this.loaded && !force) return this.user
+      this.loading = true
+      this.error = null
+      try {
+        const [me, notifications] = await Promise.all([
+          userApi.me(),
+          userApi.listNotifications(),
+        ])
+        this.user = me
+        this.notifications = notifications
+        this.loaded = true
+        return me
+      } catch (err) {
+        this.error = err instanceof Error ? err.message : '加载用户信息失败'
+        throw err
+      } finally {
+        this.loading = false
+      }
     },
-    markRead(id: string) {
-      const item = this.notifications.find((n) => n.id === id)
-      if (item) item.read = true
+    async updateMe(payload: UpdateUserPayload): Promise<AdminUser> {
+      this.error = null
+      const next = await userApi.update(payload)
+      this.user = next
+      return next
     },
-    markAllRead() {
-      this.notifications.forEach((n) => (n.read = true))
+    async pushNotification(payload: CreateNotificationPayload): Promise<AppNotification> {
+      const created = await userApi.pushNotification(payload)
+      this.notifications.unshift(created)
+      return created
     },
-  },
-  persist: {
-    key: 'mindmap.user',
+    async markRead(id: string): Promise<void> {
+      const updated = await userApi.markRead(id)
+      const idx = this.notifications.findIndex((n) => n.id === id)
+      if (idx >= 0) this.notifications[idx] = updated
+    },
+    async markAllRead(): Promise<void> {
+      await userApi.markAllRead()
+      this.notifications = this.notifications.map((n) => ({ ...n, read: true }))
+    },
   },
 })

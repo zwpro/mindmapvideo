@@ -42,10 +42,22 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_MINUTES: int = 60 * 24 * 7
 
-    # LLM
+    # LLM - OpenAI 兼容
     OPENAI_API_KEY: str = ""
     OPENAI_BASE_URL: str = "https://api.openai.com/v1"
     OPENAI_MODEL: str = "gpt-4o-mini"
+
+    # 火山引擎方舟 Responses API
+    ARK_API_KEY: str = ""
+    ARK_BASE_URL: str = "https://ark.cn-beijing.volces.com/api/v3"
+    ARK_MODEL: str = "doubao-seed-1-6-251015"
+    ARK_TIMEOUT_SECONDS: float = 120.0
+
+    # AIGCDesk（OpenAI 兼容 Chat Completions）
+    AIGCDESK_API_KEY: str = ""
+    AIGCDESK_BASE_URL: str = "https://api.aigcdesk.com/v1"
+    AIGCDESK_MODEL: str = ""
+    AIGCDESK_TIMEOUT_SECONDS: float = 120.0
 
     # 媒体存储
     MEDIA_ROOT: str = "./media"

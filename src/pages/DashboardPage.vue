@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   Search,
@@ -20,17 +20,28 @@ import AppButton from '@/components/ui/AppButton.vue'
 import AppCard from '@/components/ui/AppCard.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import { useProjectStore } from '@/stores/projects'
+import { useUserStore } from '@/stores/user'
 import { useCreateProject } from '@/composables/useCreateProject'
 import { formatRelative } from '@/lib/format'
 import type { Project, ProjectStatus } from '@/types'
 
 const router = useRouter()
 const projects = useProjectStore()
+const user = useUserStore()
 const { createAndGo } = useCreateProject()
 
 const topic = ref('')
 const keyword = ref('')
 const statusFilter = ref<'all' | ProjectStatus>('all')
+const loadError = ref<string | null>(null)
+
+onMounted(async () => {
+  try {
+    await projects.fetchList()
+  } catch (err) {
+    loadError.value = err instanceof Error ? err.message : '加载项目失败'
+  }
+})
 
 const filtered = computed(() => {
   const k = keyword.value.trim().toLowerCase()
@@ -46,7 +57,7 @@ const submit = (val?: string) => {
   const v = (val ?? topic.value).trim()
   if (!v) return
   topic.value = ''
-  createAndGo(v)
+  void createAndGo(v)
 }
 
 const filters: Array<{ key: 'all' | ProjectStatus; label: string }> = [
@@ -85,9 +96,13 @@ const editProject = (p: Project) => {
   router.push({ name: 'outline', params: { projectId: p.id } })
 }
 
-const removeProject = (p: Project) => {
-  if (confirm(`确定删除项目「${p.topic}」吗？此操作不可撤销。`)) {
-    projects.remove(p.id)
+const removeProject = async (p: Project) => {
+  if (!confirm(`确定删除项目「${p.topic}」吗？此操作不可撤销。`)) return
+  try {
+    await projects.remove(p.id)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '删除失败'
+    user.pushNotification({ title: '删除失败', body: message, level: 'warning' })
   }
 }
 </script>

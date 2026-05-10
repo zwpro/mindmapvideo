@@ -7,6 +7,7 @@ import {
   Wand2,
   Film,
   CheckCircle2,
+  Clapperboard,
   Sparkles,
 } from 'lucide-vue-next'
 import PageShell from '@/components/layout/PageShell.vue'
@@ -75,8 +76,16 @@ watch(
   },
 )
 
-onMounted(() => {
-  if (!task.value) {
+onMounted(async () => {
+  try {
+    const t = await tasks.fetchTask(taskId.value)
+    if (!projects.byId(t.projectId)) {
+      await projects.fetchOne(t.projectId).catch(() => undefined)
+    }
+    if (t.videoId && !tasks.videoById(t.videoId)) {
+      tasks.fetchVideo(t.videoId).catch(() => undefined)
+    }
+  } catch {
     router.replace({ name: 'dashboard' })
   }
 })
@@ -97,9 +106,9 @@ onMounted(() => {
 
       <AppCard class="!p-10 text-center">
         <div
-          class="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-electric-400/40 bg-electric-400/10 text-3xl shadow-glow animate-pulse-ring"
+          class="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-electric-400/40 bg-electric-400/10 text-electric-400 shadow-glow animate-pulse-ring"
         >
-          🎬
+          <Clapperboard class="h-9 w-9" />
         </div>
         <h2 class="mt-6 font-display text-h3 font-semibold">
           AI 正在为你打造视频

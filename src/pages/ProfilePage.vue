@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { Save, Trash2, Bell, BellOff, Database } from 'lucide-vue-next'
 import PageShell from '@/components/layout/PageShell.vue'
 import AppCard from '@/components/ui/AppCard.vue'
@@ -18,6 +18,19 @@ const taskStore = useTaskStore()
 const nickname = ref(userStore.user.nickname)
 const bio = ref(userStore.user.bio)
 const saved = ref(false)
+const saving = ref(false)
+const error = ref<string | null>(null)
+
+onMounted(async () => {
+  try {
+    await Promise.all([
+      userStore.fetchMe(),
+      projectStore.fetchList(),
+    ])
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '加载失败'
+  }
+})
 
 watch(
   () => userStore.user,
@@ -27,11 +40,22 @@ watch(
   },
 )
 
-const save = () => {
-  userStore.user.nickname = nickname.value.trim() || 'Admin'
-  userStore.user.bio = bio.value
-  saved.value = true
-  setTimeout(() => (saved.value = false), 1500)
+const save = async () => {
+  if (saving.value) return
+  saving.value = true
+  error.value = null
+  try {
+    await userStore.updateMe({
+      nickname: nickname.value.trim() || 'Admin',
+      bio: bio.value,
+    })
+    saved.value = true
+    setTimeout(() => (saved.value = false), 1500)
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '保存失败'
+  } finally {
+    saving.value = false
+  }
 }
 
 const stats = computed(() => ({
@@ -40,13 +64,21 @@ const stats = computed(() => ({
   notifications: userStore.notifications.length,
 }))
 
-const clearProjects = () => {
+const clearProjects = async () => {
   if (!confirm('确定要清空所有项目数据吗？此操作不可撤销。')) return
-  projectStore.projects = []
+  const list = [...projectStore.projects]
+  for (const p of list) {
+    await projectStore.remove(p.id).catch(() => undefined)
+  }
 }
 
-const clearNotifications = () => {
+const clearNotifications = async () => {
+  await userStore.markAllRead().catch(() => undefined)
   userStore.notifications = []
+}
+
+const markAllRead = async () => {
+  await userStore.markAllRead().catch(() => undefined)
 }
 </script>
 
@@ -91,11 +123,12 @@ const clearNotifications = () => {
             />
           </div>
           <div class="flex items-center gap-3">
-            <AppButton variant="primary" @click="save">
+            <AppButton variant="primary" :disabled="saving" @click="save">
               <Save class="h-4 w-4" />
-              保存
+              {{ saving ? '保存中…' : '保存' }}
             </AppButton>
             <span v-if="saved" class="text-xs text-electric-400">已保存</span>
+            <span v-if="error" class="text-xs text-danger">{{ error }}</span>
           </div>
         </div>
       </AppCard>
@@ -110,7 +143,7 @@ const clearNotifications = () => {
             <button
               v-if="userStore.unreadCount > 0"
               class="text-xs text-mist-400 hover:text-electric-400 transition"
-              @click="userStore.markAllRead()"
+              @click="markAllRead"
             >
               全部标记已读
             </button>

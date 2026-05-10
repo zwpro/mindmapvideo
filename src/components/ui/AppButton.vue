@@ -26,7 +26,7 @@ const props = withDefaults(
 
 const classes = computed(() =>
   cn(
-    'inline-flex items-center justify-center gap-2 font-medium tracking-wide',
+    'inline-flex items-center justify-center gap-2 font-medium tracking-wide whitespace-nowrap shrink-0',
     'transition-all duration-200 select-none',
     'border focus:outline-none focus-visible:ring-2 focus-visible:ring-electric-400/60',
     'disabled:opacity-50 disabled:cursor-not-allowed',
