@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { nanoid } from 'nanoid'
 import {
@@ -8,27 +8,19 @@ import {
   RefreshCw,
   Plus,
   Trash2,
-  Wand2,
+  ArrowUp,
+  ArrowDown,
   Save,
+  FileText,
 } from 'lucide-vue-next'
 import PageShell from '@/components/layout/PageShell.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppCard from '@/components/ui/AppCard.vue'
 import AppInput from '@/components/ui/AppInput.vue'
 import AppStepper from '@/components/ui/AppStepper.vue'
-import MindMapCanvas from '@/components/mindmap/MindMapCanvas.vue'
 import { useProjectStore } from '@/stores/projects'
-import { streamOutline, type StreamHandle } from '@/services/outlineMock'
-import {
-  cloneOutline,
-  countNodes,
-  findNode,
-  findParent,
-  maxDepth,
-  recomputeDepth,
-  removeNode,
-} from '@/lib/outline'
-import type { OutlineNode } from '@/types'
+import { streamScenes, type StreamHandle } from '@/services/outlineMock'
+import type { Scene } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -37,7 +29,7 @@ const projects = useProjectStore()
 const projectId = computed(() => route.params.projectId as string)
 const project = computed(() => projects.byId(projectId.value))
 
-const root = ref<OutlineNode | null>(null)
+const scenes = ref<Scene[]>([])
 const streaming = ref(false)
 const selectedId = ref<string | null>(null)
 const stream = ref<StreamHandle | null>(null)
@@ -49,43 +41,58 @@ const STEPS = [
   { key: 'preview', label: '预览导出' },
 ]
 
-const stats = computed(() => ({
-  nodes: countNodes(root.value),
-  depth: root.value ? maxDepth(root.value) + 1 : 0,
-}))
-
-const selectedNode = computed(() =>
-  selectedId.value ? findNode(root.value, selectedId.value) : null,
+const selectedIndex = computed(() =>
+  scenes.value.findIndex((s) => s.id === selectedId.value),
 )
+const selectedScene = computed<Scene | null>(() =>
+  selectedIndex.value >= 0 ? scenes.value[selectedIndex.value] : null,
+)
+
+const totalWords = computed(() =>
+  scenes.value.reduce((sum, s) => sum + s.content.length, 0),
+)
+
+const estimatedDuration = computed(() => {
+  const seconds = Math.max(20, Math.round(totalWords.value / 4))
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  return m > 0 ? `${m} 分 ${s} 秒` : `${s} 秒`
+})
+
+const reindex = () => {
+  scenes.value.forEach((s, i) => {
+    s.index = i
+  })
+}
+
+const persist = () => {
+  if (!project.value) return
+  reindex()
+  const snapshot = JSON.parse(JSON.stringify(scenes.value)) as Scene[]
+  if (typeof projects.setScenes === 'function') {
+    projects.setScenes(projectId.value, snapshot)
+  } else {
+    projects.update(projectId.value, { scenes: snapshot })
+  }
+}
 
 const startStream = () => {
   if (!project.value) return
-  root.value = null
+  scenes.value = []
   streaming.value = true
   selectedId.value = null
   stream.value?.cancel()
-  const buffer = new Map<string, OutlineNode>()
-  stream.value = streamOutline(project.value.topic, (chunk) => {
-    if (chunk.type === 'node' && chunk.node) {
-      const node: OutlineNode = { ...chunk.node, children: [] }
-      buffer.set(node.id, node)
-      if (node.parentId === null) {
-        root.value = node
-      } else {
-        const parent = buffer.get(node.parentId)
-        if (parent) {
-          parent.children.push(node)
-          root.value = root.value ? { ...root.value } : root.value
-        }
+  stream.value = streamScenes(project.value.topic, (chunk) => {
+    if (chunk.type === 'scene' && chunk.scene) {
+      scenes.value.push({ ...chunk.scene })
+      if (selectedId.value === null) {
+        selectedId.value = chunk.scene.id
       }
     }
     if (chunk.type === 'done') {
       streaming.value = false
-      if (root.value) {
-        recomputeDepth(root.value)
-        projects.setOutline(projectId.value, cloneOutline(root.value)!)
-        selectedId.value = root.value.id
-      }
+      reindex()
+      persist()
     }
   })
 }
@@ -99,94 +106,77 @@ const onSelect = (id: string) => {
   selectedId.value = id
 }
 
-const onAddChild = (id: string) => {
-  const target = findNode(root.value, id)
-  if (!target) return
-  const child: OutlineNode = {
-    id: `n-${nanoid(6)}`,
-    parentId: target.id,
-    title: '新节点',
-    depth: target.depth + 1,
-    children: [],
+const addScene = () => {
+  const newScene: Scene = {
+    id: `s-${nanoid(6)}`,
+    index: scenes.value.length,
+    title: '新增分镜',
+    content: '在右侧编辑这一页要讲的内容…',
   }
-  target.children.push(child)
-  root.value = { ...root.value! }
-  selectedId.value = child.id
+  const insertAt =
+    selectedIndex.value >= 0 ? selectedIndex.value + 1 : scenes.value.length
+  scenes.value.splice(insertAt, 0, newScene)
+  selectedId.value = newScene.id
+  persist()
 }
 
-const onEditNode = (id: string) => {
-  selectedId.value = id
-  setTimeout(() => {
-    const input = document.getElementById('node-title-input') as HTMLInputElement | null
-    input?.focus()
-    input?.select()
-  }, 50)
-}
-
-const updateTitle = (val: string) => {
-  if (!selectedNode.value) return
-  selectedNode.value.title = val
-  root.value = { ...root.value! }
-}
-
-const updateNote = (val: string) => {
-  if (!selectedNode.value) return
-  selectedNode.value.note = val
-  root.value = { ...root.value! }
-}
-
-const deleteSelected = () => {
-  if (!selectedNode.value || !root.value) return
-  if (selectedNode.value.id === root.value.id) {
-    alert('根节点不能删除')
-    return
+const removeScene = (id: string) => {
+  const i = scenes.value.findIndex((s) => s.id === id)
+  if (i < 0) return
+  scenes.value.splice(i, 1)
+  if (selectedId.value === id) {
+    selectedId.value =
+      scenes.value[i]?.id ?? scenes.value[i - 1]?.id ?? null
   }
-  const parent = findParent(root.value, selectedNode.value.id)
-  removeNode(root.value, selectedNode.value.id)
-  root.value = { ...root.value! }
-  selectedId.value = parent?.id ?? root.value.id
+  persist()
 }
 
-const addSibling = () => {
-  if (!selectedNode.value || !root.value) return
-  if (selectedNode.value.id === root.value.id) {
-    onAddChild(root.value.id)
-    return
-  }
-  const parent = findParent(root.value, selectedNode.value.id)
-  if (!parent) return
-  const sib: OutlineNode = {
-    id: `n-${nanoid(6)}`,
-    parentId: parent.id,
-    title: '新节点',
-    depth: parent.depth + 1,
-    children: [],
-  }
-  parent.children.push(sib)
-  root.value = { ...root.value! }
-  selectedId.value = sib.id
+const moveScene = (id: string, direction: -1 | 1) => {
+  const i = scenes.value.findIndex((s) => s.id === id)
+  if (i < 0) return
+  const j = i + direction
+  if (j < 0 || j >= scenes.value.length) return
+  const [item] = scenes.value.splice(i, 1)
+  scenes.value.splice(j, 0, item)
+  persist()
 }
 
-const save = () => {
-  if (!root.value || !project.value) return
-  recomputeDepth(root.value)
-  projects.setOutline(projectId.value, cloneOutline(root.value)!)
+const onTitleInput = (value: string) => {
+  if (!selectedScene.value) return
+  selectedScene.value.title = value
+}
+const onContentInput = (e: Event) => {
+  if (!selectedScene.value) return
+  const target = e.target as HTMLTextAreaElement
+  selectedScene.value.content = target.value
 }
 
+let saveTimer: ReturnType<typeof setTimeout> | null = null
+watch(
+  scenes,
+  () => {
+    if (streaming.value) return
+    if (saveTimer) clearTimeout(saveTimer)
+    saveTimer = setTimeout(persist, 600)
+  },
+  { deep: true },
+)
+
+const goBack = () => router.push({ name: 'home' })
 const goNext = () => {
-  if (!root.value) return
-  save()
+  if (!project.value || streaming.value || !scenes.value.length) return
+  persist()
   router.push({ name: 'config', params: { projectId: projectId.value } })
 }
 
 onMounted(() => {
   if (!project.value) {
-    router.replace({ name: 'dashboard' })
+    router.replace({ name: 'home' })
     return
   }
-  if (project.value.outline) {
-    root.value = cloneOutline(project.value.outline)
-    selectedId.value = root.value!.id
+  if (project.value.scenes && project.value.scenes.length) {
+    scenes.value = JSON.parse(JSON.stringify(project.value.scenes))
+    selectedId.value = scenes.value[0]?.id ?? null
   } else {
     startStream()
   }
@@ -194,165 +184,217 @@ onMounted(() => {
 
 onUnmounted(() => {
   stream.value?.cancel()
+  if (saveTimer) clearTimeout(saveTimer)
 })
 </script>
 
 <template>
-  <PageShell hide-footer full-height>
+  <PageShell full-height>
     <div class="container-page flex h-full flex-col gap-6 py-8">
       <!-- HEADER -->
-      <div class="flex flex-col gap-4">
-        <div class="flex items-center justify-between gap-3">
+      <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div class="space-y-2">
           <button
-            class="inline-flex items-center gap-1.5 text-sm text-mist-400 hover:text-electric-400"
-            @click="router.push('/dashboard')"
+            class="inline-flex items-center gap-1 text-xs uppercase tracking-[0.3em] text-mist-400 transition hover:text-electric-400"
+            @click="goBack"
           >
-            <ArrowLeft class="h-4 w-4" /> 返回工作台
+            <ArrowLeft class="h-3.5 w-3.5" /> 返回首页
           </button>
+          <h1 class="font-display text-3xl text-moon-50">分镜大纲</h1>
+          <p class="text-sm text-mist-400">
+            主题：<span class="text-moon-50">{{ project?.topic }}</span> · 共
+            <span class="text-electric-400">{{ scenes.length }}</span> 页 · 预估时长 {{ estimatedDuration }}
+          </p>
+        </div>
+        <div class="flex flex-wrap items-center gap-3">
+          <AppStepper :steps="STEPS" :current="0" />
           <div class="flex items-center gap-2">
             <AppButton
-              variant="secondary"
+              variant="ghost"
               size="sm"
               :disabled="streaming"
               @click="regenerate"
             >
-              <RefreshCw class="h-4 w-4" :class="streaming && 'animate-spin'" />
-              重新生成
-            </AppButton>
-            <AppButton variant="ghost" size="sm" @click="save">
-              <Save class="h-4 w-4" /> 保存
+              <RefreshCw class="h-4 w-4" /> 重新生成
             </AppButton>
             <AppButton
               variant="primary"
               size="sm"
-              :disabled="streaming || !root"
+              :disabled="streaming || !scenes.length"
               @click="goNext"
             >
-              下一步 · 视频配置 <ArrowRight class="h-4 w-4" />
+              {{ streaming ? '生成中…' : '下一步 · 视频配置' }}
+              <ArrowRight v-if="!streaming" class="h-4 w-4" />
             </AppButton>
           </div>
         </div>
-        <AppStepper :steps="STEPS" :current="0" />
       </div>
 
-      <!-- TOPIC -->
-      <AppCard class="!p-5">
-        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div class="flex items-center gap-3">
-            <span
-              class="grid h-9 w-9 place-items-center rounded-md border border-electric-400/30 bg-electric-400/10"
-            >
-              <Wand2 class="h-4 w-4 text-electric-400" />
-            </span>
-            <div>
-              <p class="text-xs uppercase tracking-wider text-mist-500">
-                当前主题
-              </p>
-              <h2 class="font-display text-lg font-semibold text-moon-50">
-                {{ project?.topic ?? '—' }}
-              </h2>
-            </div>
-          </div>
-          <div class="flex items-center gap-6 text-xs text-mist-400">
-            <div>
-              <span class="text-mist-500">节点</span>
-              <span class="ml-2 font-display text-base text-moon-50">{{
-                stats.nodes
-              }}</span>
-            </div>
-            <div>
-              <span class="text-mist-500">层级</span>
-              <span class="ml-2 font-display text-base text-moon-50">{{
-                stats.depth
-              }}</span>
-            </div>
-          </div>
-        </div>
-      </AppCard>
-
       <!-- WORKSPACE -->
-      <div class="grid flex-1 grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
-        <div class="min-h-[520px]">
-          <MindMapCanvas
-            :root="root"
-            :selected-id="selectedId"
-            :streaming="streaming"
-            @select="onSelect"
-            @add-child="onAddChild"
-            @edit="onEditNode"
-          />
-        </div>
-
-        <!-- INSPECTOR -->
-        <AppCard class="!p-5 h-fit">
-          <div class="mb-4 flex items-center justify-between">
-            <h3 class="font-display text-base font-semibold">节点编辑</h3>
-            <span class="text-xs text-mist-500">双击节点可编辑</span>
+      <div class="grid flex-1 grid-cols-1 gap-6 lg:grid-cols-[360px_1fr]">
+        <!-- 分镜列表 -->
+        <AppCard padded class="flex flex-col">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-xs uppercase tracking-[0.3em] text-mist-400">分镜列表</p>
+              <p class="mt-1 text-sm text-moon-50">点击切换 · 拖拽顺序由 ↑↓ 控制</p>
+            </div>
+            <AppButton
+              variant="ghost"
+              size="sm"
+              :disabled="streaming"
+              @click="addScene"
+            >
+              <Plus class="h-4 w-4" /> 添加
+            </AppButton>
           </div>
 
-          <template v-if="selectedNode">
-            <div class="space-y-4">
-              <div>
-                <label
-                  class="mb-1.5 block text-xs uppercase tracking-wider text-mist-500"
-                  >标题</label
+          <div class="mt-4 flex-1 space-y-2 overflow-y-auto pr-1">
+            <div
+              v-for="(scene, idx) in scenes"
+              :key="scene.id"
+              :class="[
+                'group cursor-pointer rounded-xl border p-3 transition-all',
+                selectedId === scene.id
+                  ? 'border-electric-400 bg-indigo-50 shadow-soft'
+                  : 'border-zinc-200 bg-white hover:border-electric-400/40 hover:bg-zinc-50',
+              ]"
+              @click="onSelect(scene.id)"
+            >
+              <div class="flex items-start gap-3">
+                <span
+                  :class="[
+                    'mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-display',
+                    selectedId === scene.id
+                      ? 'bg-electric-400 text-white'
+                      : 'bg-zinc-100 text-mist-400',
+                  ]"
                 >
-                <AppInput
-                  id="node-title-input"
-                  size="sm"
-                  :model-value="selectedNode.title"
-                  @update:model-value="updateTitle"
-                />
+                  {{ idx + 1 }}
+                </span>
+                <div class="min-w-0 flex-1">
+                  <p class="truncate text-sm text-moon-50">{{ scene.title || '未命名分镜' }}</p>
+                  <p class="mt-1 line-clamp-2 text-xs text-mist-400">
+                    {{ scene.content || '暂无内容…' }}
+                  </p>
+                </div>
               </div>
-              <div>
-                <label
-                  class="mb-1.5 block text-xs uppercase tracking-wider text-mist-500"
-                  >备注（可选）</label
-                >
-                <textarea
-                  class="block min-h-[88px] w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-moon-50 placeholder:text-mist-500 outline-none transition-colors focus:border-electric-400/60"
-                  placeholder="为该节点补充更多解释，将被纳入配音脚本…"
-                  :value="selectedNode.note ?? ''"
-                  @input="(e) => updateNote((e.target as HTMLTextAreaElement).value)"
-                />
-              </div>
-
-              <div class="grid grid-cols-2 gap-2">
-                <AppButton variant="secondary" size="sm" @click="onAddChild(selectedNode.id)">
-                  <Plus class="h-4 w-4" /> 子节点
-                </AppButton>
-                <AppButton variant="secondary" size="sm" @click="addSibling">
-                  <Plus class="h-4 w-4" /> 同级
-                </AppButton>
-                <AppButton
-                  variant="danger"
-                  size="sm"
-                  class="col-span-2"
-                  :disabled="root && selectedNode.id === root.id"
-                  @click="deleteSelected"
-                >
-                  <Trash2 class="h-4 w-4" /> 删除节点
-                </AppButton>
-              </div>
-
               <div
-                class="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-[11px] leading-relaxed text-mist-500"
+                class="mt-2 flex items-center justify-end gap-1 opacity-0 transition group-hover:opacity-100"
+                :class="{ 'opacity-100': selectedId === scene.id }"
               >
-                <p>📌 操作提示</p>
-                <ul class="mt-1 space-y-1">
-                  <li>· 单击节点选中并查看详情</li>
-                  <li>· 选中后右侧 <kbd>+</kbd> 按钮添加子节点</li>
-                  <li>· 拖拽空白处可平移画布，<kbd>Ctrl/Cmd</kbd> + 滚轮缩放</li>
-                </ul>
+                <button
+                  class="rounded-md p-1 text-mist-400 transition hover:bg-zinc-100 hover:text-moon-50 disabled:opacity-40"
+                  :disabled="idx === 0"
+                  title="上移"
+                  @click.stop="moveScene(scene.id, -1)"
+                >
+                  <ArrowUp class="h-3.5 w-3.5" />
+                </button>
+                <button
+                  class="rounded-md p-1 text-mist-400 transition hover:bg-zinc-100 hover:text-moon-50 disabled:opacity-40"
+                  :disabled="idx === scenes.length - 1"
+                  title="下移"
+                  @click.stop="moveScene(scene.id, 1)"
+                >
+                  <ArrowDown class="h-3.5 w-3.5" />
+                </button>
+                <button
+                  class="rounded-md p-1 text-mist-400 transition hover:bg-rose-50 hover:text-rose-500 disabled:opacity-40"
+                  :disabled="scenes.length <= 1"
+                  title="删除"
+                  @click.stop="removeScene(scene.id)"
+                >
+                  <Trash2 class="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+
+            <div
+              v-if="streaming"
+              class="rounded-xl border border-dashed border-electric-400/40 bg-indigo-50/50 p-3 text-center text-xs text-electric-400"
+            >
+              正在流式生成分镜…
+            </div>
+
+            <div
+              v-if="!streaming && !scenes.length"
+              class="rounded-xl border border-dashed border-zinc-200 p-6 text-center text-xs text-mist-400"
+            >
+              暂无分镜，点击「重新生成」或「添加」开始创建。
+            </div>
+          </div>
+        </AppCard>
+
+        <!-- 编辑面板 -->
+        <AppCard padded class="flex flex-col">
+          <template v-if="selectedScene">
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <p class="text-xs uppercase tracking-[0.3em] text-mist-400">
+                  第 {{ selectedIndex + 1 }} / {{ scenes.length }} 页
+                </p>
+                <p class="mt-1 text-sm text-mist-400">分镜内容会用于视频中的旁白与字幕</p>
+              </div>
+              <div class="flex items-center gap-2 text-xs text-mist-400">
+                <Save class="h-3.5 w-3.5" />
+                <span>自动保存</span>
+              </div>
+            </div>
+
+            <div class="mt-5 space-y-2">
+              <label class="text-xs uppercase tracking-[0.3em] text-mist-400">分镜标题</label>
+              <AppInput
+                :model-value="selectedScene.title"
+                placeholder="给这一页起个标题"
+                size="md"
+                class="w-full"
+                @update:model-value="onTitleInput"
+              />
+            </div>
+
+            <div class="mt-5 flex flex-1 flex-col">
+              <div class="flex items-center justify-between">
+                <label class="text-xs uppercase tracking-[0.3em] text-mist-400">分镜内容</label>
+                <span class="text-xs text-mist-400">
+                  <FileText class="mr-1 inline h-3 w-3" />
+                  {{ selectedScene.content.length }} 字
+                </span>
+              </div>
+              <textarea
+                :value="selectedScene.content"
+                placeholder="这一页要讲的内容（建议 60-200 字）"
+                class="mt-2 min-h-[260px] flex-1 resize-none rounded-xl border border-zinc-200 bg-white p-4 text-sm text-moon-50 placeholder:text-mist-400/60 focus:border-electric-400 focus:outline-none focus:ring-2 focus:ring-electric-400/20"
+                @input="onContentInput"
+              ></textarea>
+            </div>
+
+            <div class="mt-5 grid grid-cols-3 gap-3">
+              <div class="rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+                <p class="text-xs text-mist-400">页码</p>
+                <p class="mt-1 font-display text-lg text-moon-50">
+                  {{ selectedIndex + 1 }} / {{ scenes.length }}
+                </p>
+              </div>
+              <div class="rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+                <p class="text-xs text-mist-400">本页字数</p>
+                <p class="mt-1 font-display text-lg text-moon-50">
+                  {{ selectedScene.content.length }}
+                </p>
+              </div>
+              <div class="rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+                <p class="text-xs text-mist-400">全篇总字数</p>
+                <p class="mt-1 font-display text-lg text-moon-50">{{ totalWords }}</p>
               </div>
             </div>
           </template>
 
-          <template v-else>
-            <div class="py-12 text-center text-sm text-mist-500">
-              <p>选择一个节点开始编辑</p>
-            </div>
-          </template>
+          <div
+            v-else
+            class="flex flex-1 items-center justify-center text-sm text-mist-400"
+          >
+            从左侧选择一页分镜开始编辑
+          </div>
         </AppCard>
       </div>
     </div>

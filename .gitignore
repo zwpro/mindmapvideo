@@ -23,3 +23,20 @@ dist-ssr
 *.sln
 *.sw?
 .vite
+
+# Python 后端（api/）
+api/__pycache__/
+api/**/__pycache__/
+api/.venv/
+api/venv/
+api/.env
+api/.env.local
+api/*.db
+api/*.sqlite3
+api/.pytest_cache/
+api/.ruff_cache/
+api/.mypy_cache/
+api/media/
+api/dist/
+api/build/
+api/*.egg-info/

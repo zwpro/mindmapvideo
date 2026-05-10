@@ -29,7 +29,7 @@ const attrs = useAttrs()
 
 const wrapperClass = computed(() =>
   cn(
-    'group relative flex items-center gap-3 border bg-white transition-all',
+    'group relative flex items-center gap-3 border bg-white transition-all w-full min-w-0',
     'focus-within:bg-white',
     {
       'h-10 rounded-md px-3 text-sm border-zinc-200 focus-within:border-electric-400/60': props.size === 'sm',

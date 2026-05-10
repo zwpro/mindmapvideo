@@ -124,19 +124,20 @@ const features = [
           </p>
 
           <form
-            class="mt-10 flex flex-col sm:flex-row gap-3 max-w-2xl mx-auto"
+            class="mt-10 flex flex-col sm:flex-row items-center justify-center gap-3 w-full max-w-xl mx-auto"
             @submit.prevent="submit"
           >
             <AppInput
               v-model="topic"
               placeholder="例如：用三分钟讲清楚相对论"
-              class="flex-1"
+              class="flex-1 min-w-0"
               size="lg"
             />
             <AppButton
               type="submit"
               variant="primary"
               size="lg"
+              class="w-full sm:w-auto shrink-0"
               :loading="submitting"
               :disabled="!topic.trim()"
             >

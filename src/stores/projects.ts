@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { nanoid } from 'nanoid'
-import type { OutlineNode, Project, ProjectStatus, VideoConfig } from '@/types'
+import type { OutlineNode, Project, ProjectStatus, Scene, VideoConfig } from '@/types'
 import { DEFAULT_VIDEO_CONFIG } from '@/lib/constants'
 
 interface State {
@@ -16,6 +16,7 @@ const seed: Project[] = [
     thumbnailUrl:
       'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=futuristic%20mindmap%20visualization%20about%20artificial%20intelligence%20history%2C%20deep%20navy%20background%2C%20cyan%20neon%20nodes%2C%20glowing%20connections&image_size=landscape_16_9',
     outline: null,
+    scenes: null,
     config: { ...DEFAULT_VIDEO_CONFIG },
     videoId: 'video-demo-1',
     createdAt: new Date(Date.now() - 86_400_000 * 3).toISOString(),
@@ -29,6 +30,7 @@ const seed: Project[] = [
     thumbnailUrl:
       'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=mindmap%20diagram%20about%20python%20learning%20roadmap%2C%20dark%20theme%2C%20mint%20green%20highlights%2C%20clean%20typography&image_size=landscape_16_9',
     outline: null,
+    scenes: null,
     config: { ...DEFAULT_VIDEO_CONFIG },
     createdAt: new Date(Date.now() - 86_400_000 * 5).toISOString(),
     updatedAt: new Date(Date.now() - 86_400_000 * 2).toISOString(),
@@ -41,6 +43,7 @@ const seed: Project[] = [
     thumbnailUrl:
       'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=abstract%20blockchain%20mindmap%20concept%20art%2C%20glowing%20chain%20links%2C%20cyberpunk%20palette%2C%20cinematic%20lighting&image_size=landscape_16_9',
     outline: null,
+    scenes: null,
     config: { ...DEFAULT_VIDEO_CONFIG },
     createdAt: new Date(Date.now() - 86_400_000 * 1).toISOString(),
     updatedAt: new Date(Date.now() - 3_600_000).toISOString(),
@@ -77,6 +80,7 @@ export const useProjectStore = defineStore('projects', {
         status: 'draft',
         thumbnailUrl: thumbnailFor(topic),
         outline: null,
+        scenes: null,
         config: { ...DEFAULT_VIDEO_CONFIG },
         createdAt: now,
         updatedAt: now,
@@ -91,6 +95,9 @@ export const useProjectStore = defineStore('projects', {
     },
     setOutline(id: string, outline: OutlineNode) {
       this.update(id, { outline })
+    },
+    setScenes(id: string, scenes: Scene[]) {
+      this.update(id, { scenes })
     },
     setConfig(id: string, config: VideoConfig) {
       this.update(id, { config })

@@ -1,0 +1,43 @@
+# 本地开发环境依赖（MySQL + Redis）
+# 用法：
+#   docker compose -f docker-compose.dev.yml up -d
+# 数据持久化在命名 volume 中，不随容器删除而丢失。
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: mindmap-mysql
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: mindmap
+      MYSQL_USER: mindmap
+      MYSQL_PASSWORD: mindmap
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --default-time-zone=+08:00
+      - --max_connections=500
+    volumes:
+      - mindmap_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    container_name: mindmap-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - mindmap_redis_data:/data
+
+volumes:
+  mindmap_mysql_data:
+  mindmap_redis_data:

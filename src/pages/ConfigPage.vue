@@ -69,7 +69,8 @@ const tryBgm = (id: string) => {
 }
 
 const estimatedDuration = computed(() => {
-  const baseSeconds = 60 + config.nodeDuration * 8
+  const sceneCount = project.value?.scenes?.length ?? 8
+  const baseSeconds = 30 + sceneCount * 15
   const m = Math.floor(baseSeconds / 60)
   const s = baseSeconds % 60
   return `${m}:${String(s).padStart(2, '0')}`
@@ -146,32 +147,44 @@ onMounted(() => {
 
       <div class="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px]">
         <div class="space-y-6">
-          <!-- 动画风格 -->
+          <!-- 视觉主题 -->
           <AppCard>
             <div class="mb-4 flex items-center gap-2">
-              <Sparkles class="h-4 w-4 text-electric-400" />
-              <h3 class="font-display text-base font-semibold">动画风格</h3>
-              <span class="text-xs text-mist-500">选择视频动画的呈现方式</span>
+              <Palette class="h-4 w-4 text-electric-400" />
+              <h3 class="font-display text-base font-semibold">视觉主题</h3>
             </div>
-            <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <div class="grid grid-cols-2 gap-3 lg:grid-cols-5">
               <button
-                v-for="s in ANIMATION_STYLES"
-                :key="s.id"
+                v-for="t in THEME_STYLES"
+                :key="t.id"
                 :class="
                   cn(
-                    'rounded-xl border p-4 text-left transition-all',
-                    config.animationStyle === s.id
-                      ? 'border-electric-400/60 bg-electric-400/5 shadow-glow-sm'
-                      : 'border-zinc-200 bg-zinc-50 hover:border-zinc-300',
+                    'overflow-hidden rounded-xl border p-3 text-left transition-all',
+                    config.theme === t.id
+                      ? 'border-electric-400/60 shadow-glow-sm'
+                      : 'border-zinc-200 hover:border-zinc-300',
                   )
                 "
-                @click="config.animationStyle = s.id"
+                @click="config.theme = t.id"
               >
-                <div class="text-2xl">{{ s.emoji }}</div>
-                <div class="mt-2 font-medium text-moon-50">{{ s.name }}</div>
-                <p class="mt-1 text-xs leading-relaxed text-mist-500">
-                  {{ s.description }}
-                </p>
+                <div
+                  class="relative mb-3 flex h-16 items-center justify-center overflow-hidden rounded-md ring-1 ring-inset ring-black/5"
+                  :style="{
+                    background: `linear-gradient(135deg, ${t.primary} 0%, ${t.mid} 50%, ${t.accent} 100%)`,
+                  }"
+                >
+                  <span
+                    class="font-display text-xs font-semibold tracking-wide"
+                    :style="{
+                      color: t.textOnCover,
+                      textShadow: '0 1px 2px rgba(0,0,0,0.12)',
+                    }"
+                  >
+                    {{ t.name }}
+                  </span>
+                </div>
+                <div class="text-sm font-medium text-moon-50">{{ t.name }}</div>
+                <p class="text-[11px] text-mist-500">{{ t.description }}</p>
               </button>
             </div>
           </AppCard>
@@ -182,70 +195,25 @@ onMounted(() => {
               <Sliders class="h-4 w-4 text-electric-400" />
               <h3 class="font-display text-base font-semibold">视频参数</h3>
             </div>
-            <div class="grid gap-6 md:grid-cols-2">
-              <div>
-                <p class="mb-2 text-xs uppercase tracking-wider text-mist-500">分辨率</p>
-                <div class="flex flex-wrap gap-2">
-                  <button
-                    v-for="r in RESOLUTIONS"
-                    :key="r.id"
-                    :class="
-                      cn(
-                        'rounded-md border px-3 py-2 text-left text-xs transition-all',
-                        config.resolution === r.id
-                          ? 'border-electric-400/60 bg-electric-400/10 text-electric-400'
-                          : 'border-zinc-200 text-mist-400 hover:text-moon-50 hover:border-zinc-300',
-                      )
-                    "
-                    @click="config.resolution = r.id"
-                  >
-                    <div class="text-sm font-medium">{{ r.label }}</div>
-                    <div class="text-[11px] text-mist-500">{{ r.hint }}</div>
-                  </button>
-                </div>
-              </div>
-              <div>
-                <p class="mb-2 text-xs uppercase tracking-wider text-mist-500">画面比例</p>
-                <div class="flex flex-wrap gap-2">
-                  <button
-                    v-for="r in RATIOS"
-                    :key="r.id"
-                    :class="
-                      cn(
-                        'rounded-md border px-3 py-2 text-left text-xs transition-all',
-                        config.ratio === r.id
-                          ? 'border-electric-400/60 bg-electric-400/10 text-electric-400'
-                          : 'border-zinc-200 text-mist-400 hover:text-moon-50 hover:border-zinc-300',
-                      )
-                    "
-                    @click="config.ratio = r.id"
-                  >
-                    <div class="text-sm font-medium">{{ r.label }}</div>
-                    <div class="text-[11px] text-mist-500">{{ r.hint }}</div>
-                  </button>
-                </div>
-              </div>
-              <div class="md:col-span-2">
-                <div class="flex items-center justify-between">
-                  <p class="text-xs uppercase tracking-wider text-mist-500">
-                    单节点停留时长
-                  </p>
-                  <span class="text-xs text-electric-400">
-                    {{ config.nodeDuration }} 秒
-                  </span>
-                </div>
-                <input
-                  v-model.number="config.nodeDuration"
-                  type="range"
-                  min="2"
-                  max="8"
-                  step="1"
-                  class="mt-3 w-full accent-electric-400"
-                />
-                <div class="mt-1 flex justify-between text-[11px] text-mist-500">
-                  <span>紧凑 2s</span>
-                  <span>舒缓 8s</span>
-                </div>
+            <div>
+              <p class="mb-2 text-xs uppercase tracking-wider text-mist-500">分辨率</p>
+              <div class="flex flex-wrap gap-2">
+                <button
+                  v-for="r in RESOLUTIONS"
+                  :key="r.id"
+                  :class="
+                    cn(
+                      'rounded-md border px-3 py-2 text-left text-xs transition-all',
+                      config.resolution === r.id
+                        ? 'border-electric-400/60 bg-electric-400/10 text-electric-400'
+                        : 'border-zinc-200 text-mist-400 hover:text-moon-50 hover:border-zinc-300',
+                    )
+                  "
+                  @click="config.resolution = r.id"
+                >
+                  <div class="text-sm font-medium">{{ r.label }}</div>
+                  <div class="text-[11px] text-mist-500">{{ r.hint }}</div>
+                </button>
               </div>
             </div>
           </AppCard>
@@ -258,77 +226,35 @@ onMounted(() => {
             </div>
 
             <p class="mb-2 text-xs uppercase tracking-wider text-mist-500">AI 配音</p>
-            <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
-              <button
-                v-for="v in VOICES"
-                :key="v.id"
-                :class="
-                  cn(
-                    'flex flex-col items-start gap-2 rounded-xl border p-3 text-left transition-all',
-                    config.voice?.id === v.id
-                      ? 'border-electric-400/60 bg-electric-400/5'
-                      : 'border-zinc-200 bg-zinc-50 hover:border-zinc-300',
-                  )
-                "
-                @click="config.voice = config.voice ? { ...config.voice, id: v.id } : { id: v.id, speed: 1, volume: 0.9 }"
-              >
-                <div class="flex w-full items-center justify-between">
-                  <span
-                    class="grid h-8 w-8 place-items-center rounded-md font-display text-sm font-semibold"
-                    :style="{ backgroundColor: v.color, color: '#0B1A2A' }"
-                  >
-                    {{ v.name[0] }}
-                  </span>
-                  <button
-                    class="text-mist-400 transition-colors hover:text-electric-400"
-                    aria-label="试听"
-                    @click.stop="tryVoice(v.id)"
-                  >
-                    <Play
-                      class="h-4 w-4"
-                      :class="playingVoice === v.id && 'text-electric-400 animate-pulse'"
-                    />
-                  </button>
+            <div
+              class="relative overflow-hidden rounded-xl border border-dashed border-electric-400/40 bg-indigo-50/60 px-5 py-6"
+            >
+              <div class="flex items-start gap-4">
+                <div
+                  class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-electric-400/15 text-electric-400"
+                >
+                  <Sparkles class="h-5 w-5" />
                 </div>
-                <div>
-                  <div class="text-sm font-medium text-moon-50">
-                    {{ v.name }}
-                    <span class="ml-1 text-[11px] text-mist-500">{{ v.gender }}</span>
+                <div class="flex-1">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span class="font-display text-sm font-semibold text-moon-50">
+                      AI 配音
+                    </span>
+                    <span
+                      class="rounded-full border border-electric-400/40 bg-white px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-electric-400"
+                    >
+                      内测中
+                    </span>
                   </div>
-                  <p class="text-[11px] text-mist-500">{{ v.description }}</p>
+                  <p class="mt-1 text-xs leading-relaxed text-mist-500">
+                    多音色 AI 配音功能正在内测打磨中，即将上线。届时支持中英双语、多种音色与情感风格，敬请期待。
+                  </p>
                 </div>
-              </button>
-            </div>
-
-            <div class="mt-5 grid gap-4 md:grid-cols-2">
-              <div v-if="config.voice">
-                <div class="flex items-center justify-between text-xs">
-                  <span class="text-mist-500">语速</span>
-                  <span class="text-electric-400">{{ config.voice.speed.toFixed(1) }}x</span>
-                </div>
-                <input
-                  v-model.number="config.voice.speed"
-                  type="range"
-                  min="0.6"
-                  max="1.6"
-                  step="0.1"
-                  class="mt-2 w-full accent-electric-400"
-                />
               </div>
-              <div v-if="config.voice">
-                <div class="flex items-center justify-between text-xs">
-                  <span class="text-mist-500">音量</span>
-                  <span class="text-electric-400">{{ Math.round(config.voice.volume * 100) }}%</span>
-                </div>
-                <input
-                  v-model.number="config.voice.volume"
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  class="mt-2 w-full accent-electric-400"
-                />
-              </div>
+              <div
+                aria-hidden="true"
+                class="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-electric-400/10 blur-2xl"
+              ></div>
             </div>
 
             <div class="mt-6">
@@ -356,42 +282,6 @@ onMounted(() => {
               </div>
             </div>
           </AppCard>
-
-          <!-- 主题 -->
-          <AppCard>
-            <div class="mb-4 flex items-center gap-2">
-              <Palette class="h-4 w-4 text-electric-400" />
-              <h3 class="font-display text-base font-semibold">视觉主题</h3>
-            </div>
-            <div class="grid grid-cols-2 gap-3 lg:grid-cols-5">
-              <button
-                v-for="t in THEME_STYLES"
-                :key="t.id"
-                :class="
-                  cn(
-                    'overflow-hidden rounded-xl border p-3 text-left transition-all',
-                    config.theme === t.id
-                      ? 'border-electric-400/60 shadow-glow-sm'
-                      : 'border-zinc-200 hover:border-zinc-300',
-                  )
-                "
-                @click="config.theme = t.id"
-              >
-                <div
-                  class="mb-3 flex h-16 items-center justify-center rounded-md"
-                  :style="{
-                    background: `linear-gradient(135deg, ${t.primary} 0%, ${t.accent} 100%)`,
-                  }"
-                >
-                  <span class="font-display text-xs font-semibold text-white drop-shadow">
-                    {{ t.name }}
-                  </span>
-                </div>
-                <div class="text-sm font-medium text-moon-50">{{ t.name }}</div>
-                <p class="text-[11px] text-mist-500">{{ t.description }}</p>
-              </button>
-            </div>
-          </AppCard>
         </div>
 
         <!-- SUMMARY -->
@@ -404,9 +294,9 @@ onMounted(() => {
                 <span class="text-moon-50 line-clamp-1 max-w-[60%] text-right">{{ project?.topic }}</span>
               </div>
               <div class="flex items-center justify-between">
-                <span class="text-mist-500">动画风格</span>
+                <span class="text-mist-500">视觉主题</span>
                 <AppBadge tone="electric">
-                  {{ ANIMATION_STYLES.find((s) => s.id === config.animationStyle)?.name }}
+                  {{ THEME_STYLES.find((t) => t.id === config.theme)?.name }}
                 </AppBadge>
               </div>
               <div class="flex items-center justify-between">
@@ -414,20 +304,8 @@ onMounted(() => {
                 <span class="text-moon-50">{{ config.resolution.toUpperCase() }}</span>
               </div>
               <div class="flex items-center justify-between">
-                <span class="text-mist-500">画面比例</span>
-                <span class="text-moon-50">{{ config.ratio }}</span>
-              </div>
-              <div class="flex items-center justify-between">
                 <span class="text-mist-500">配音</span>
-                <span class="text-moon-50">
-                  {{ VOICES.find((v) => v.id === config.voice?.id)?.name ?? '无' }}
-                </span>
-              </div>
-              <div class="flex items-center justify-between">
-                <span class="text-mist-500">主题</span>
-                <span class="text-moon-50">
-                  {{ THEME_STYLES.find((t) => t.id === config.theme)?.name }}
-                </span>
+                <span class="text-moon-50">内测中</span>
               </div>
               <div class="my-3 h-px bg-zinc-200" />
               <div class="flex items-center justify-between text-base">

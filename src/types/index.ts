@@ -19,6 +19,14 @@ export interface OutlineNode {
   children: OutlineNode[]
 }
 
+export interface Scene {
+  id: string
+  index: number
+  title: string
+  content: string
+  note?: string
+}
+
 export interface VideoConfig {
   animationStyle: AnimationStyle
   resolution: Resolution
@@ -43,6 +51,7 @@ export interface Project {
   status: ProjectStatus
   thumbnailUrl: string
   outline: OutlineNode | null
+  scenes: Scene[] | null
   config: VideoConfig
   videoId?: string
   taskId?: string

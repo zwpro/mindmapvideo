@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import type { OutlineNode } from '@/types'
 import { layoutMindmap, type LaidOutNode } from '@/lib/mindmapLayout'
 import { cn } from '@/lib/utils'
@@ -26,18 +26,40 @@ const emit = defineEmits<{
 
 const layout = computed(() => layoutMindmap(props.root))
 
+const containerRef = ref<HTMLDivElement | null>(null)
 const scale = ref(1)
 const offset = ref({ x: 24, y: 24 })
+const userInteracted = ref(false)
 
 const dragState = ref<{ x: number; y: number; ox: number; oy: number } | null>(
   null,
 )
 
+const fitToView = () => {
+  const el = containerRef.value
+  if (!el) return
+  const { width: lw, height: lh } = layout.value
+  if (!lw || !lh) return
+  const cw = el.clientWidth
+  const ch = el.clientHeight
+  if (!cw || !ch) return
+  const padding = 32
+  const sx = (cw - padding * 2) / lw
+  const sy = (ch - padding * 2) / lh
+  const next = Math.min(1, Math.max(0.4, Math.min(sx, sy)))
+  scale.value = next
+  offset.value = {
+    x: (cw - lw * next) / 2,
+    y: (ch - lh * next) / 2,
+  }
+}
+
 const onWheel = (e: WheelEvent) => {
   if (!e.ctrlKey && !e.metaKey) return
   e.preventDefault()
   const delta = e.deltaY > 0 ? -0.08 : 0.08
-  scale.value = Math.max(0.5, Math.min(1.6, scale.value + delta))
+  scale.value = Math.max(0.4, Math.min(1.6, scale.value + delta))
+  userInteracted.value = true
 }
 
 const onMouseDown = (e: MouseEvent) => {
@@ -57,6 +79,7 @@ const onMouseMove = (e: MouseEvent) => {
     x: dragState.value.ox + (e.clientX - dragState.value.x),
     y: dragState.value.oy + (e.clientY - dragState.value.y),
   }
+  userInteracted.value = true
 }
 
 const endDrag = () => {
@@ -65,13 +88,15 @@ const endDrag = () => {
 
 const zoomIn = () => {
   scale.value = Math.min(1.6, scale.value + 0.1)
+  userInteracted.value = true
 }
 const zoomOut = () => {
-  scale.value = Math.max(0.5, scale.value - 0.1)
+  scale.value = Math.max(0.4, scale.value - 0.1)
+  userInteracted.value = true
 }
 const reset = () => {
-  scale.value = 1
-  offset.value = { x: 24, y: 24 }
+  userInteracted.value = false
+  fitToView()
 }
 
 const path = (from: LaidOutNode, to: LaidOutNode) => {
@@ -113,14 +138,25 @@ const onEdit = (id: string) => {
 watch(
   () => props.root?.id,
   () => {
+    userInteracted.value = false
     scale.value = 1
     offset.value = { x: 24, y: 24 }
   },
+)
+
+watch(
+  () => [layout.value.width, layout.value.height],
+  () => {
+    if (userInteracted.value) return
+    nextTick(fitToView)
+  },
+  { immediate: true },
 )
 </script>
 
 <template>
   <div
+    ref="containerRef"
     class="relative h-full w-full overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-50"
     @wheel.passive="onWheel"
     @mousedown="onMouseDown"

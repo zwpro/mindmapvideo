@@ -8,7 +8,7 @@ import type {
 
 export const DEFAULT_VIDEO_CONFIG: VideoConfig = {
   animationStyle: 'unfold',
-  resolution: '1080p',
+  resolution: '720p',
   ratio: '16:9',
   nodeDuration: 4,
   voice: { id: 'voice-aurora', speed: 1, volume: 0.9 },
@@ -49,16 +49,12 @@ export const ANIMATION_STYLES: Array<{
 ]
 
 export const RESOLUTIONS: Array<{ id: Resolution; label: string; hint: string }> = [
-  { id: '720p', label: '720P', hint: '1280×720 · 流畅' },
-  { id: '1080p', label: '1080P', hint: '1920×1080 · 推荐' },
-  { id: '2k', label: '2K', hint: '2560×1440 · 高清' },
-  { id: '4k', label: '4K', hint: '3840×2160 · 极致' },
+  { id: '720p', label: '720P', hint: '1280×720 · 推荐' },
+  { id: '1080p', label: '1080P', hint: '1920×1080 · 高清' },
 ]
 
 export const RATIOS: Array<{ id: Ratio; label: string; hint: string }> = [
   { id: '16:9', label: '16 : 9', hint: '横屏 · 知识科普' },
-  { id: '9:16', label: '9 : 16', hint: '竖屏 · 短视频' },
-  { id: '1:1', label: '1 : 1', hint: '方屏 · 社交流' },
 ]
 
 export const VOICES: Array<{
@@ -111,42 +107,54 @@ export const THEME_STYLES: Array<{
   name: string
   description: string
   primary: string
+  mid: string
   accent: string
+  textOnCover: string
 }> = [
   {
     id: 'minimal',
     name: '极简白',
     description: '高对比黑白灰，专业内敛',
-    primary: '#0B1A2A',
-    accent: '#7CFFCB',
+    primary: '#F8FAFC',
+    mid: '#E2E8F0',
+    accent: '#94A3B8',
+    textOnCover: '#0F172A',
   },
   {
     id: 'tech',
     name: '科技墨蓝',
     description: '深墨蓝 + 电光青，未来科技感',
     primary: '#0B1A2A',
-    accent: '#7CFFCB',
+    mid: '#1E3A8A',
+    accent: '#22D3EE',
+    textOnCover: '#FFFFFF',
   },
   {
     id: 'academic',
     name: '学院米黄',
     description: '米黄底色 + 衬线字体，沉稳学术',
-    primary: '#3B2F1F',
-    accent: '#C97D3F',
+    primary: '#FEF3C7',
+    mid: '#D6A55C',
+    accent: '#7C2D12',
+    textOnCover: '#3B2F1F',
   },
   {
     id: 'cartoon',
     name: '卡通糖果',
     description: '高饱和糖果色，活泼亲和',
-    primary: '#5B3FBF',
-    accent: '#FFC857',
+    primary: '#FB7185',
+    mid: '#A855F7',
+    accent: '#FACC15',
+    textOnCover: '#FFFFFF',
   },
   {
     id: 'business',
     name: '商务深紫',
     description: '深紫 + 香槟金，正式品质',
     primary: '#1F1B3A',
+    mid: '#5B21B6',
     accent: '#D4AF37',
+    textOnCover: '#FFFFFF',
   },
 ]
 

@@ -1,0 +1,9 @@
+# 开发期额外依赖（lint / 类型 / 测试）
+# 用法：pip install -r requirements-dev.txt
+
+-r requirements.txt
+
+ruff>=0.7.0
+mypy>=1.13.0
+pytest>=8.3.0
+pytest-asyncio>=0.24.0
