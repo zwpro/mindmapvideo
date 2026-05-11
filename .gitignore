@@ -39,7 +39,13 @@ api/*.sqlite3
 api/.pytest_cache/
 api/.ruff_cache/
 api/.mypy_cache/
-api/media/
+# 媒体目录：忽略 api/media/ 下的所有自动产物（videos/thumbnails/scripts/pipeline_logs 等），
+# 但保留 bgm/ 与 fonts/ —— 这两个目录里放的是项目静态资源（BGM 音轨、CJK 字体），需要随仓库分发。
+# 注意：要先用 api/media/* 匹配每个直接子目录，再用 !api/media/bgm/ / !api/media/fonts/ 取消忽略；
+# 不能直接 api/media/，否则 git 不会再向下扫描内部的反向规则。
+api/media/*
+!api/media/bgm/
+!api/media/fonts/
 api/dist/
 api/build/
 api/*.egg-info/
