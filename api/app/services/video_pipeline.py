@@ -118,6 +118,8 @@ SYSTEM_PROMPT = """\
 USER_PROMPT_TEMPLATE = """\
 主题：{topic}
 
+片头片尾分别展示主题和结尾，并在中间展示分镜。
+
 分镜（共 {n} 条）。每条中 "title" 是简短标签，"context" 是描述该分镜内容的文字，每个分镜是一个独立的动画场景页面，页面里的分析内容可根据 context 进一步展开，形式动画各不相同，好看。
 
 {scenes_block}
