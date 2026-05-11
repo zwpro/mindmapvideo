@@ -95,7 +95,8 @@ async def create_project(
     )
     db.add(orm)
     await db.commit()
-    await db.refresh(orm)
+    # 不 refresh：session=expire_on_commit=False，所有列都是 Python 端 set 的，
+    # 生产 MySQL 主从/代理下 refresh 可能读不到刚写入行抛 InvalidRequestError。
     return _orm_to_project(orm, with_scenes=False)
 
 
@@ -145,10 +146,11 @@ async def update_project(
             )
 
     await db.commit()
-    # commit 后 onupdate=func.now() 的 updated_at 会被 expire，
-    # 访问时会同步触发 lazy load → 在 async 环境下抛 MissingGreenlet。
-    # 这里显式刷新标量列与 scenes 关系。
-    await db.refresh(orm)
+    # 标量列不需要 refresh：updated_at 走 Python 端 onupdate=utcnow，flush 时已贴到对象上，
+    # session=expire_on_commit=False 也不会过期。生产 MySQL 主从代理下 refresh 还会偶发
+    # 「读不到刚写入行」抛 InvalidRequestError。
+    # 但 scenes 必须 refresh：上面 sa_delete + db.add 后内存里 orm.scenes 集合已脏，
+    # 不重新加载会让响应里返回过期的分镜列表。
     await db.refresh(orm, attribute_names=["scenes"])
     return _orm_to_project(orm, with_scenes=True)
 

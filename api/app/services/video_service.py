@@ -82,7 +82,11 @@ async def create_task(db: AsyncSession, project_id: str) -> VideoTask:
     project.status = "generating"
 
     await db.commit()
-    await db.refresh(task_orm)
+    # 故意不 await db.refresh(task_orm)：
+    # 1) session 配的是 expire_on_commit=False，commit 后属性不会被过期；
+    # 2) 这条 task 的所有字段都是我们刚在代码里 set 的，没有 server_default 需要回读；
+    # 3) 生产环境若有 MySQL 主从代理 / ProxySQL，refresh 的 SELECT 可能被路由到尚未同步
+    #    的从库导致返回 0 行，触发 `Could not refresh instance` 让整个接口挂 500。
 
     # 调度后台流水线（fire-and-forget）。必须在 commit 之后再调度，
     # 否则后台任务可能比 task 行先抵达 DB，导致 _update_task 找不到记录。

@@ -69,7 +69,8 @@ async def update_me(db: AsyncSession, payload: AdminUserUpdate) -> AdminUser:
     if "bio" in patch and patch["bio"] is not None:
         orm.bio = patch["bio"]
     await db.commit()
-    await db.refresh(orm)
+    # 不 refresh：session=expire_on_commit=False，且所有字段都是 Python 端 set 的，
+    # 生产环境主从代理下 refresh 可能从未追上的从库读到 0 行触发 InvalidRequestError。
     return _orm_to_user(orm)
 
 
@@ -98,7 +99,7 @@ async def push_notification(
     )
     db.add(orm)
     await db.commit()
-    await db.refresh(orm)
+    # 同 update_me：不需要 refresh，所有列都是 Python 端写定的。
     return _orm_to_notification(orm)
 
 
@@ -112,7 +113,7 @@ async def mark_read(db: AsyncSession, notification_id: str) -> AppNotification |
         return None
     orm.read = True
     await db.commit()
-    await db.refresh(orm)
+    # 同 update_me：不需要 refresh，read 字段是 Python 端置 True 后写库。
     return _orm_to_notification(orm)
 
 
