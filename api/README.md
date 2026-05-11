@@ -34,6 +34,66 @@ api/
 └── .env.example
 ```
 
+## 系统依赖（视频合成必装）
+
+视频合成走 `manim` + `ffmpeg` 两个外部进程，Python 包靠 `pip` 能装上，但下面这几样得自己装好并保证在 `PATH` 里：
+
+| 依赖 | 用途 | 是否必装 |
+| --- | --- | --- |
+| **ffmpeg** | manim 编码 mp4；`video_pipeline.py` 抽缩略图、混 BGM | ✅ 必装 |
+| **Microsoft YaHei / Source Han Sans 等中文字体** | manim 渲染中文 `Text(...)` | ✅ 必装（Windows 自带 YaHei，Linux/macOS 需自行安装） |
+| **Cairo / Pango + pkg-config**（Linux/macOS） | manim 默认 cairo 后端；pip 装 `pycairo` / `manimpango` 时要从源码编译 | ✅ Linux/macOS 必装；Windows 走 wheel 通常自带 |
+| ~~LaTeX (MiKTeX / TeX Live)~~ | 本项目 prompt 里**严禁** `Tex` / `MathTex`，**不要装** | ❌ 不需要 |
+
+### 安装 ffmpeg
+
+```bash
+# Windows（任选其一）
+winget install Gyan.FFmpeg          # 官方推荐
+# choco install ffmpeg              # 用 Chocolatey
+# scoop install ffmpeg              # 用 Scoop
+
+# macOS
+brew install ffmpeg
+
+# Ubuntu / Debian
+sudo apt update && sudo apt install -y ffmpeg
+```
+
+装完后**新开一个终端**执行 `ffmpeg -version` 能打印版本号即可。
+
+### 安装 Cairo / Pango / pkg-config（仅 Linux & macOS 需要）
+
+Windows 装 `manim` 时 pip 会直接拉 `pycairo` / `manimpango` 的预编译 wheel，**可以跳过本节**。
+Linux / macOS 上 `pycairo` 没有官方 wheel，pip 会去源码编译，必须先装好 `pkg-config` + cairo / pango 开发头文件：
+
+```bash
+# Ubuntu / Debian
+sudo apt update
+sudo apt install -y build-essential python3-dev pkg-config libcairo2-dev libpango1.0-dev
+
+# Fedora / RHEL
+sudo dnf install -y gcc python3-devel pkg-config cairo-devel pango-devel
+
+# Arch
+sudo pacman -S --needed base-devel python pkg-config cairo pango
+
+# macOS
+brew install pkg-config cairo pango
+```
+
+> 如果 `pip install -e ".[dev]"` 报 **`Did not find pkg-config` / `Run-time dependency cairo found: NO` / `metadata-generation-failed (pycairo)`**，就是这步没做。装完上面的包后**重开终端、重激活 venv**再 `pip install` 一次即可。
+
+### 验证 manim 能跑
+
+激活 venv 并 `pip install -e ".[dev]"` 之后：
+
+```bash
+python -m manim --version
+```
+
+打印出 `Manim Community v0.18.x` 即视为安装成功；实际渲染由后端通过 `python -m manim render -qm ...` 子进程触发，参数见 `app/services/video_pipeline.py:_run_manim`。
+
 ## 快速开始
 
 只要本机有 **Python 3.11+** 即可，下面给三种方案任选一种。
@@ -46,19 +106,17 @@ cd api
 # 1. 创建虚拟环境（Python 自带 venv）
 python -m venv .venv
 
-# 2. 激活
-.venv\Scripts\activate          # Windows PowerShell / CMD
-# source .venv/bin/activate     # macOS / Linux / Git Bash
+# 2. 激活（按你的系统二选一，不要混抄！）
+source .venv/bin/activate       # macOS / Linux / WSL / Git Bash
+# .venv\Scripts\activate        # Windows PowerShell / CMD（注意是反斜杠 + Scripts，bash 下抄这行会把反斜杠吃掉）
 
 # 3. 升级 pip 并安装依赖
 python -m pip install --upgrade pip
 pip install -e ".[dev]"
-# 或者用 requirements.txt 等价方式：
-# pip install -r requirements.txt
 
-# 4. 配置环境变量
-copy .env.example .env          # Windows
-# cp .env.example .env          # macOS/Linux
+# 4. 配置环境变量（按你的系统二选一）
+cp .env.example .env            # macOS / Linux / WSL
+# copy .env.example .env        # Windows
 
 # 5. 启动开发服务器
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000

@@ -59,6 +59,15 @@ BGM_MUX_TIMEOUT_SECONDS = 120
 # 但保留这个 sentinel 是为了兜底旧数据/手改 DB 的情况。
 BGM_NONE_ID = "bgm-none"
 
+# 字体资源约定：把任意 .ttf/.otf/.ttc 丢到 {MEDIA_ROOT}/fonts/ 下，
+# pipeline 会在每个 LLM 生成的 manim 脚本顶部自动注入 prelude：
+#   1) manimpango.register_font(...) 注册全部字体；
+#   2) 选一个 CJK family 作为 CJK_FONT；
+#   3) 猴补 Text/MarkupText.__init__ 强制使用 CJK_FONT。
+# Linux/Debian 没装中文字体时，这是不动系统就能解决中文乱码的最干净方案。
+FONTS_DIR_NAME = "fonts"
+FONT_FILE_EXTS = (".ttf", ".otf", ".ttc")
+
 
 def _child_env() -> dict[str, str]:
     """子进程环境变量。
@@ -89,7 +98,7 @@ SYSTEM_PROMPT = """\
 1. 输出**单一** Python 文件源码，纯文本。不要加 markdown 围栏、不要任何解释，代码前后不要写注释。
 2. 只允许 `from manim import *` 这一个 import（如果确实需要，可以再加标准库 `math`）。
 4. 视频总时长整体控制在 20~180 秒之间。
-5. 文字一律用 `Text(...)`。中文显示优先尝试 `Text(content, font="Microsoft YaHei")`，并用 try/except 包住，字体不可用时回退到默认字体，**不能因为缺字体而让脚本崩**。**严禁**使用 `Tex` / `MathTex`（环境里没有 LaTeX）。
+5. 文字一律用 `Text(...)`，**不要传 `font=` 参数**——项目会在脚本顶部自动注入 CJK 字体引导代码（注册项目自带字体并猴补 `Text.__init__`），你显式传的字体名会被覆盖。直接 `Text("中文内容")` 即可。**严禁**使用 `Tex` / `MathTex`（环境里没有 LaTeX）。
 6. 不依赖任何外部资源（图片、音频、外部字体文件等）。背景色建议设为 `self.camera.background_color = "#0F172A"`（深石板蓝，与彩色节点搭配好看）。
 7. 脚本必须能直接被 `manim render -qm <file> MainScene` 跑通，不需要任何手工修改；不要使用 `self.camera.frame` 等任何 OpenGL 专属特性，我们用默认 cairo 后端渲染。
 8. **字符串字面量必须是合法 Python**。双引号字符串内部的 `"` 必须转义成 `\\"`，或者整段改用单引号；**严禁**写出 `"foo "bar" baz"` 这种裸嵌套引号。多行内容优先用三引号 `\"\"\"...\"\"\"`。最终脚本必须能通过 `compile()`，**绝不能**出现 SyntaxError。
@@ -119,6 +128,77 @@ def _build_prompt(topic: str, scenes: list[dict[str, Any]]) -> tuple[str, str]:
 
 
 _CODE_FENCE_RE = re.compile(r"^```[a-zA-Z]*\s*\n?|\n?```\s*$")
+
+
+def _build_font_prelude() -> str:
+    """生成插到 LLM manim 脚本最前面的字体注入 prelude。
+
+    设计要点：
+    - 把 {MEDIA_ROOT}/fonts/ 下所有字体文件 register 进 Pango，避免依赖系统字体。
+    - 通过 list_fonts() 差集准确识别本次新注册的 family（兼容用户随便起的字体名）；
+      如果没新增（开发机上字体已系统装好），再用一份 CJK 候选清单兜底匹配。
+    - 用 monkey-patch 强行覆盖 manim.Text / MarkupText 的 font 参数，保证就算 LLM
+      在脚本里写死 "Microsoft YaHei" 也会被换成 CJK_FONT —— manim 找不到指定字体
+      时是**静默**退到 DejaVu Sans，根本进不到 LLM 写的 try/except 分支。
+    - 全部包在 try/except 里，最坏情况下 prelude 静默失败，不影响下游 LLM 代码运行。
+    """
+    fonts_dir = (Path(settings.MEDIA_ROOT).resolve() / FONTS_DIR_NAME)
+    # 用 repr 把 Windows 反斜杠安全转义进字符串字面量
+    fonts_dir_literal = repr(str(fonts_dir))
+    font_exts_literal = repr(FONT_FILE_EXTS)
+    return f"""\
+# === auto-injected by video_pipeline: CJK font bootstrap ===
+from pathlib import Path as _Path
+
+CJK_FONT = ""
+try:
+    import manimpango as _manimpango
+    _FONTS_DIR = _Path({fonts_dir_literal})
+    _before = set(_manimpango.list_fonts())
+    if _FONTS_DIR.is_dir():
+        for _f in _FONTS_DIR.iterdir():
+            if _f.is_file() and _f.suffix.lower() in {font_exts_literal}:
+                try:
+                    _manimpango.register_font(str(_f))
+                except Exception:
+                    pass
+    _after = set(_manimpango.list_fonts())
+    _new = sorted(_after - _before)
+    if _new:
+        CJK_FONT = _new[0]
+    else:
+        for _cand in (
+            "Noto Sans CJK SC", "Noto Sans CJK", "Noto Serif CJK SC",
+            "Source Han Sans SC", "Source Han Sans CN",
+            "WenQuanYi Zen Hei", "WenQuanYi Micro Hei",
+            "Microsoft YaHei", "SimHei", "SimSun",
+            "PingFang SC", "Hiragino Sans GB",
+        ):
+            if _cand in _after:
+                CJK_FONT = _cand
+                break
+except Exception:
+    pass
+
+if CJK_FONT:
+    try:
+        import manim as _manim
+        _orig_text_init = _manim.Text.__init__
+        def _patched_text_init(self, *args, **kwargs):
+            kwargs["font"] = CJK_FONT
+            return _orig_text_init(self, *args, **kwargs)
+        _manim.Text.__init__ = _patched_text_init
+        if hasattr(_manim, "MarkupText"):
+            _orig_mt_init = _manim.MarkupText.__init__
+            def _patched_mt_init(self, *args, **kwargs):
+                kwargs["font"] = CJK_FONT
+                return _orig_mt_init(self, *args, **kwargs)
+            _manim.MarkupText.__init__ = _patched_mt_init
+    except Exception:
+        pass
+# === end font bootstrap ===
+
+"""
 
 
 def _strip_code_fences(text: str) -> str:
@@ -593,7 +673,11 @@ async def run_pipeline(task_id: str, project_id: str, video_id: str) -> None:
         topic, scenes = await _load_project_with_scenes(project_id)
         code = await _generate_manim_script(topic, scenes)
         script_path.parent.mkdir(parents=True, exist_ok=True)
-        script_path.write_text(code, encoding="utf-8")
+        # 在 LLM 代码前面拼一段 CJK 字体注入 prelude：
+        # 保证 Linux/Debian 上不装系统字体也能正常渲染中文（用 api/media/fonts/ 下的字体包）。
+        script_path.write_text(
+            _build_font_prelude() + code, encoding="utf-8"
+        )
 
         # ---------- 阶段 2：animation = 跑 manim ----------
         await _update_task(task_id, stage="animation")
