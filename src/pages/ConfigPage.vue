@@ -134,6 +134,17 @@ onMounted(async () => {
   if (project.value.config) {
     Object.assign(config, project.value.config)
   }
+  // 后端 VideoConfig.bgm 默认是 None，新建项目落库后会被 Object.assign 写成 null，
+  // 导致 ConfigPage 上 "不使用 BGM" 被高亮成默认值。
+  // 草稿态下未提交过配置，统一兜底成 BGM_OPTIONS 的第一项（bgm-ambient）；
+  // 用户主动点 "不使用 BGM" 提交后，status 会切到 generating/completed/failed，
+  // 那时保留 null 才能尊重用户选择。
+  if (!config.bgm && project.value.status === 'draft') {
+    const first = BGM_OPTIONS[0]
+    if (first && first.id !== 'bgm-none') {
+      config.bgm = { id: first.id, volume: 1 }
+    }
+  }
   const lockedResolution = RESOLUTIONS.find((r) => r.id === config.resolution)
   if (!lockedResolution || lockedResolution.comingSoon) {
     config.resolution = '720p'
