@@ -38,11 +38,11 @@ export interface RequestOptions extends Omit<RequestInit, 'body' | 'headers'> {
   headers?: Record<string, string>
   /** URL query，自动 encode */
   query?: Record<string, string | number | boolean | undefined | null>
-  /** 超时毫秒数，默认 30s */
+  /** 超时毫秒数，默认 10 分钟 */
   timeoutMs?: number
 }
 
-const DEFAULT_TIMEOUT = 30_000
+const DEFAULT_TIMEOUT = 10 * 60 * 1000 // 10 分钟
 
 function getAuthToken(): string | null {
   try {

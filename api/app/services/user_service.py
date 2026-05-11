@@ -11,6 +11,7 @@ from nanoid import generate
 from sqlalchemy import select, update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.time_utils import to_utc_iso
 from app.db.models import NotificationORM, UserORM
 from app.schemas.user import (
     AdminUser,
@@ -39,7 +40,7 @@ def _orm_to_notification(orm: NotificationORM) -> AppNotification:
         body=orm.body,
         level=orm.level,  # type: ignore[arg-type]
         read=orm.read,
-        createdAt=orm.created_at.isoformat(),
+        createdAt=to_utc_iso(orm.created_at) or "",
         link=orm.link,
     )
 

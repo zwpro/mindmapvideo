@@ -24,6 +24,9 @@ dist-ssr
 *.sw?
 .vite
 
+# Local History 扩展自动备份（xyz.local-history），别让它进 git 也别让它干扰 diff
+.history/
+
 # Python 后端（api/）
 api/__pycache__/
 api/**/__pycache__/

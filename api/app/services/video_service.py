@@ -18,6 +18,7 @@ from nanoid import generate
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.time_utils import to_utc_iso
 from app.db.models import ProjectORM, VideoDetailORM, VideoTaskORM
 from app.schemas.video import VideoDetail, VideoTask
 from app.services import video_pipeline
@@ -28,8 +29,8 @@ def _orm_to_task(orm: VideoTaskORM) -> VideoTask:
         id=orm.id,
         projectId=orm.project_id,
         stage=orm.stage,  # type: ignore[arg-type]
-        startedAt=orm.started_at.isoformat(),
-        finishedAt=orm.finished_at.isoformat() if orm.finished_at else None,
+        startedAt=to_utc_iso(orm.started_at) or "",
+        finishedAt=to_utc_iso(orm.finished_at),
         error=orm.error,
         videoId=orm.video_id,
     )
@@ -46,7 +47,7 @@ def _orm_to_video(orm: VideoDetailORM) -> VideoDetail:
         resolution=orm.resolution,  # type: ignore[arg-type]
         ratio=orm.ratio,  # type: ignore[arg-type]
         fileSize=orm.file_size,
-        createdAt=orm.created_at.isoformat(),
+        createdAt=to_utc_iso(orm.created_at) or "",
     )
 
 

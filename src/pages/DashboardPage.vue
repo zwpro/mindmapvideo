@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onActivated, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   Search,
@@ -35,13 +35,24 @@ const keyword = ref('')
 const statusFilter = ref<'all' | ProjectStatus>('all')
 const loadError = ref<string | null>(null)
 
-onMounted(async () => {
+// 每次进入工作台都强制拉一次列表：projects.fetchList 默认有 "loaded once" 缓存，
+// 这里显式传 force=true 绕开它，否则切到其它页再回来看到的是旧数据。
+const reloadList = async () => {
   try {
-    await projects.fetchList()
+    await projects.fetchList(true)
+    loadError.value = null
   } catch (err) {
     loadError.value = err instanceof Error ? err.message : '加载项目失败'
   }
-})
+}
+
+onMounted(reloadList)
+// 给未来可能套上 <keep-alive> 的场景留兜底：组件被激活时也刷新
+onActivated(reloadList)
+
+// 切换分类（statusFilter）时重新调用列表接口
+// flush:'post' 确保按钮 UI 状态先翻新再发请求
+watch(statusFilter, reloadList, { flush: 'post' })
 
 const filtered = computed(() => {
   const k = keyword.value.trim().toLowerCase()
@@ -117,7 +128,7 @@ const removeProject = async (p: Project) => {
           <div>
             <h1 class="font-display text-h2 font-semibold">工作台</h1>
             <p class="mt-2 text-sm text-mist-400">
-              管理你的全部思维导图视频项目，从这里开始下一支创作。
+              管理你的全部分镜视频项目，从这里开始下一支创作。
             </p>
           </div>
           <div class="w-full max-w-xl">

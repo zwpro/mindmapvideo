@@ -19,7 +19,7 @@ import { Sparkles, Github, Twitter, Send } from 'lucide-vue-next'
           </span>
         </div>
         <p class="max-w-md text-sm leading-relaxed text-mist-400">
-          AI 驱动的思维导图视频生成平台 ——
+          AI 驱动的分镜大纲视频生成平台 ——
           输入主题，分钟级产出结构化大纲与配音动画视频，覆盖知识科普、教育培训、企业课件等场景。
         </p>
       </div>

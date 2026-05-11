@@ -51,6 +51,10 @@ const headerClass = computed(() =>
         <span class="font-display text-lg font-semibold tracking-tight"
           >MindMap<span class="text-electric-400">Video</span></span
         >
+        <span
+          class="ml-1 inline-flex items-center rounded-md border border-electric-400/40 bg-electric-400/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-electric-400"
+          >Beta</span
+        >
       </RouterLink>
 
       <nav class="hidden items-center gap-1 md:flex">

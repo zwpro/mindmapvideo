@@ -44,12 +44,12 @@ const steps = [
   {
     icon: Brain,
     title: '输入主题',
-    desc: '一句话写下你想讲的内容，AI 会在数秒内拆解成结构化大纲。',
+    desc: '一句话写下你想讲的内容，AI 会在数秒内拆解成分镜大纲。',
   },
   {
     icon: Wand2,
-    title: '编辑大纲',
-    desc: '在思维导图画布上确认、调整节点，所见即所得。',
+    title: '编辑分镜',
+    desc: '在可视化编辑器中确认、调整每一幕分镜脚本，所见即所得。',
   },
   {
     icon: Clapperboard,
@@ -83,17 +83,17 @@ const features = [
   {
     icon: Lightbulb,
     title: '智能拆解',
-    desc: '内置教学/讲解/科普三种结构模板，自动生成层级合理的大纲。',
+    desc: '输入任意主题，AI 自动生成结构清晰的分镜大纲，覆盖教学、科普、讲解等多种场景。',
   },
   {
     icon: Layers,
     title: '可视化编辑',
-    desc: '思维导图画布，支持增删改、拖拽、深度调整与节点检视。',
+    desc: '逐镜编辑文案、旁白与画面描述，支持增删、排序与实时预览，所改即所见。',
   },
   {
     icon: Rocket,
     title: '一键出片',
-    desc: '配置模板与配音后提交，全流程跟踪渲染进度，自动生成成片。',
+    desc: '选择模板与配音风格后一键提交，全流程跟踪渲染进度，分镜自动合成完整视频。',
   },
 ]
 </script>
@@ -119,7 +119,7 @@ const features = [
           </h1>
 
           <p class="mt-6 text-lg text-mist-400 leading-relaxed">
-            输入主题 → AI 生成大纲 → 你确认与编辑 → 一键渲染成片。<br />
+            输入主题 → AI 生成分镜大纲 → 你确认与编辑 → 一键渲染成片。<br />
             无需剪辑技能，3 步创建结构清晰、节奏流畅的知识短视频。
           </p>
 
@@ -195,7 +195,7 @@ const features = [
           <h2 class="font-display text-h2 font-semibold text-moon-50">看看别人是怎么用的</h2>
         </div>
         <p class="text-mist-400 max-w-md">
-          从科普讲解到面试备考，思维导图视频的创作场景没有边界。
+          从科普讲解到面试备考，分镜视频的创作场景没有边界。
         </p>
       </div>
 
@@ -220,7 +220,7 @@ const features = [
           </div>
           <div class="p-5">
             <h3 class="font-display text-lg font-semibold text-moon-50">{{ c.title }}</h3>
-            <p class="mt-2 text-xs text-mist-400">{{ c.nodes }} 个节点 · 教学模板</p>
+            <p class="mt-2 text-xs text-mist-400">{{ c.nodes }} 个分镜 · 教学模板</p>
           </div>
         </AppCard>
       </div>
@@ -250,7 +250,7 @@ const features = [
             准备好把你的想法变成视频了吗？
           </h2>
           <p class="text-mist-400 mb-8 max-w-xl mx-auto">
-            不用打开剪辑软件，不用画分镜。只需输入主题，剩下的交给 AI。
+            不用打开剪辑软件，不用手写分镜脚本。只需输入主题，剩下的交给 AI。
           </p>
           <AppButton variant="primary" size="lg" @click="router.push({ name: 'dashboard' })">
             进入工作台

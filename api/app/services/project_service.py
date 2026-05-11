@@ -12,6 +12,7 @@ from sqlalchemy import delete as sa_delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.time_utils import to_utc_iso
 from app.db.models import ProjectORM, SceneORM
 from app.schemas.project import OutlineNode, Project, ProjectCreate, ProjectUpdate
 from app.schemas.scene import Scene
@@ -50,8 +51,8 @@ def _orm_to_project(orm: ProjectORM, *, with_scenes: bool = False) -> Project:
         config=VideoConfig.model_validate(orm.config),
         videoId=orm.video_id,
         taskId=orm.task_id,
-        createdAt=orm.created_at.isoformat(),
-        updatedAt=orm.updated_at.isoformat(),
+        createdAt=to_utc_iso(orm.created_at) or "",
+        updatedAt=to_utc_iso(orm.updated_at) or "",
     )
 
 

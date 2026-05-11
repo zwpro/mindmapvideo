@@ -27,19 +27,31 @@ const STEPS = [
   { key: 'preview', label: '预览导出' },
 ]
 
-// done 后由 watch 触发跳转预览页
+// 跳转预览页的目标 videoId 既可能来自 task，也可能来自 project
+const resolvedVideoId = computed(
+  () => task.value?.videoId || project.value?.videoId || null,
+)
+
+// 防止 watch 在同一个任务上反复 push
+let navigated = false
+const tryNavigateToPreview = () => {
+  if (navigated) return
+  if (task.value?.stage !== 'done') return
+  const vid = resolvedVideoId.value
+  if (!vid) return
+  navigated = true
+  setTimeout(() => {
+    router.replace({ name: 'preview', params: { videoId: vid } })
+  }, 600)
+}
+
+// 同时监听 stage 和 videoId：
+// - 刷新页面落在已完成的任务上时（stage 不再变化）也能触发跳转 → immediate: true
+// - stage 已经是 done、但 project.videoId 还没回填时，等 videoId 出现后再跳
 watch(
-  () => task.value?.stage,
-  (stage) => {
-    if (stage === 'done' && project.value?.videoId) {
-      setTimeout(() => {
-        router.replace({
-          name: 'preview',
-          params: { videoId: project.value!.videoId! },
-        })
-      }, 600)
-    }
-  },
+  () => [task.value?.stage, resolvedVideoId.value] as const,
+  () => tryNavigateToPreview(),
+  { immediate: true },
 )
 
 // 后端 video_pipeline 异步推进 stage，前端只轮询 stage 字段，
@@ -58,8 +70,14 @@ const tickOnce = async () => {
     const t = await tasks.fetchTask(taskId.value)
     if (t.stage === 'done' || t.stage === 'failed') {
       stopPolling()
-      if (t.stage === 'done' && t.videoId && !tasks.videoById(t.videoId)) {
-        tasks.fetchVideo(t.videoId).catch(() => undefined)
+      if (t.stage === 'done') {
+        // 完成时刷新一下 project，以便拿到后端最终落库的 videoId
+        if (!project.value?.videoId) {
+          projects.fetchOne(t.projectId).catch(() => undefined)
+        }
+        if (t.videoId && !tasks.videoById(t.videoId)) {
+          tasks.fetchVideo(t.videoId).catch(() => undefined)
+        }
       }
     }
   } catch {
@@ -76,7 +94,13 @@ onMounted(async () => {
     if (t.videoId && !tasks.videoById(t.videoId)) {
       tasks.fetchVideo(t.videoId).catch(() => undefined)
     }
-    if (t.stage !== 'done' && t.stage !== 'failed') {
+    if (t.stage === 'done') {
+      // 落在“已完成”的任务上：可能 project 里还没有 videoId，需要再拉一次
+      if (!project.value?.videoId) {
+        await projects.fetchOne(t.projectId).catch(() => undefined)
+      }
+      tryNavigateToPreview()
+    } else if (t.stage !== 'failed') {
       pollTimer = setInterval(tickOnce, 2000)
     }
   } catch {

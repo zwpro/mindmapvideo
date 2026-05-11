@@ -8,9 +8,10 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, String, func
+from sqlalchemy import DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.core.time_utils import utcnow
 from app.db.session import Base
 
 
@@ -27,11 +28,11 @@ class UserORM(Base):
     role: Mapped[str] = mapped_column(String(32), nullable=False, default="user")
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
+        DateTime(timezone=True), default=utcnow, nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        server_default=func.now(),
-        onupdate=func.now(),
+        default=utcnow,
+        onupdate=utcnow,
         nullable=False,
     )

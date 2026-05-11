@@ -59,6 +59,13 @@ class Settings(BaseSettings):
     AIGCDESK_MODEL: str = ""
     AIGCDESK_TIMEOUT_SECONDS: float = 120.0
 
+    # SoCheap（Anthropic Messages 协议）— AIGCDesk 的回退通道
+    # 调用 _generate_manim_script 时若 AIGCDesk 异常会自动转走这条线路
+    SOCHEAP_API_KEY: str = ""
+    SOCHEAP_BASE_URL: str = "https://api.socheap.cc"
+    SOCHEAP_MODEL: str = ""
+    SOCHEAP_TIMEOUT_SECONDS: float = 120.0
+
     # 媒体存储
     MEDIA_ROOT: str = "./media"
     MEDIA_BASE_URL: str = "http://localhost:8000/media"

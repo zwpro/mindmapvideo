@@ -99,7 +99,7 @@ const regenerate = () => {
             {{ project?.topic || '未命名项目' }}
           </h1>
 
-          <AppCard class="overflow-hidden p-0">
+          <AppCard :padded="false" class="!rounded-lg overflow-hidden">
             <div class="aspect-video bg-zinc-950 relative">
               <video
                 :src="video.url"

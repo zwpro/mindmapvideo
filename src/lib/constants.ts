@@ -48,9 +48,14 @@ export const ANIMATION_STYLES: Array<{
   },
 ]
 
-export const RESOLUTIONS: Array<{ id: Resolution; label: string; hint: string }> = [
+export const RESOLUTIONS: Array<{
+  id: Resolution
+  label: string
+  hint: string
+  comingSoon?: boolean
+}> = [
   { id: '720p', label: '720P', hint: '1280×720 · 推荐' },
-  { id: '1080p', label: '1080P', hint: '1920×1080 · 高清' },
+  { id: '1080p', label: '1080P', hint: '1920×1080 · 即将开放', comingSoon: true },
 ]
 
 export const RATIOS: Array<{ id: Ratio; label: string; hint: string }> = [
@@ -160,11 +165,16 @@ export const THEME_STYLES: Array<{
 
 export const POPULAR_TOPICS = [
   '人工智能发展史',
-  'Python 入门学习路线',
-  '区块链基础原理',
+  '成大事前，先研究自己',
+  '福祸相依，否极泰来',
   '光合作用全过程',
-  '欧洲文艺复兴',
+  '聪明人最后都走向金融市场',
   '宇宙的起源',
-  'SEO 优化指南',
-  '一节课讲透 Transformer',
+  '不要干预他人命运',
+  '通货膨胀：那个偷你钱的隐形小偷',
+  '成事不在大开局，而在小复利',
+  '人脉的真相：先成为，再吸引',
+  '杠杆是天使，也是魔鬼',
+  '知识付费的真相：知识不是商品，而是资产',
+  '未来已来：AI 正在改变一切',
 ]

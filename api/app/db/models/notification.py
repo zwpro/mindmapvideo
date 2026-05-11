@@ -8,9 +8,10 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.core.time_utils import utcnow
 from app.db.session import Base
 
 
@@ -32,5 +33,5 @@ class NotificationORM(Base):
     read: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+        DateTime(timezone=True), default=utcnow, nullable=False, index=True
     )

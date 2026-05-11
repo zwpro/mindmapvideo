@@ -41,11 +41,11 @@ const project = computed(() => projects.byId(projectId.value))
 
 const config = reactive<VideoConfig>({
   animationStyle: 'unfold',
-  resolution: '1080p',
+  resolution: '720p',
   ratio: '16:9',
   nodeDuration: 4,
   voice: { id: 'voice-aurora', speed: 1, volume: 0.9 },
-  bgm: { id: 'bgm-ambient', volume: 0.4 },
+  bgm: { id: 'bgm-ambient', volume: 1 },
   theme: 'tech',
 })
 
@@ -80,19 +80,15 @@ const estimatedDuration = computed(() => {
 const submit = async () => {
   if (!project.value) return
   try {
+    // 1) 把 ConfigPage 上的视频参数落到 project.config
     await projects.setConfig(projectId.value, JSON.parse(JSON.stringify(config)))
-    await projects.setStatus(projectId.value, 'generating')
 
+    // 2) 创建任务：后端 video_service.create_task 会同步把 task 入库 +
+    //    把 project.status('generating') / task_id / video_id 一并落库后立即返回，
+    //    真正的视频合成在后台 video_pipeline 里异步推进。
+    //    这里 *不能* 立刻 fetchVideo —— compose 阶段才会写 video_details，
+    //    早于那之前请求会 404 把整个 try 块抛飞，直接卡在 ConfigPage 不跳转。
     const task = await tasks.createTask(projectId.value)
-    await projects.update(projectId.value, { taskId: task.id })
-
-    if (task.videoId) {
-      const video = await tasks.fetchVideo(task.videoId)
-      await projects.update(projectId.value, {
-        videoId: video.id,
-        status: 'completed',
-      })
-    }
 
     user.pushNotification({
       title: '视频生成已启动',
@@ -100,10 +96,10 @@ const submit = async () => {
       level: 'info',
     })
 
+    // 3) 立即跳到进度页，由 ProgressPage 通过轮询拿 stage 流转
     router.push({ name: 'progress', params: { taskId: task.id } })
   } catch (err) {
     console.error('[ConfigPage] createTask failed', err)
-    await projects.setStatus(projectId.value, 'failed').catch(() => undefined)
     user.pushNotification({
       title: '视频生成失败',
       body: err instanceof Error ? err.message : '未知错误',
@@ -118,7 +114,7 @@ const setBgm = (id: string) => {
   } else {
     config.bgm = config.bgm
       ? { ...config.bgm, id }
-      : { id, volume: 0.4 }
+      : { id, volume: 1 }
   }
 }
 
@@ -137,6 +133,10 @@ onMounted(async () => {
   }
   if (project.value.config) {
     Object.assign(config, project.value.config)
+  }
+  const lockedResolution = RESOLUTIONS.find((r) => r.id === config.resolution)
+  if (!lockedResolution || lockedResolution.comingSoon) {
+    config.resolution = '720p'
   }
 })
 </script>
@@ -217,17 +217,29 @@ onMounted(async () => {
                 <button
                   v-for="r in RESOLUTIONS"
                   :key="r.id"
+                  :disabled="r.comingSoon"
+                  :title="r.comingSoon ? '即将开放' : ''"
                   :class="
                     cn(
-                      'rounded-md border px-3 py-2 text-left text-xs transition-all',
-                      config.resolution === r.id
-                        ? 'border-electric-400/60 bg-electric-400/10 text-electric-400'
-                        : 'border-zinc-200 text-mist-400 hover:text-moon-50 hover:border-zinc-300',
+                      'relative rounded-md border px-3 py-2 text-left text-xs transition-all',
+                      r.comingSoon
+                        ? 'cursor-not-allowed border-zinc-200 bg-zinc-50 text-mist-400 opacity-60'
+                        : config.resolution === r.id
+                          ? 'border-electric-400/60 bg-electric-400/10 text-electric-400'
+                          : 'border-zinc-200 text-mist-400 hover:text-moon-50 hover:border-zinc-300',
                     )
                   "
-                  @click="config.resolution = r.id"
+                  @click="!r.comingSoon && (config.resolution = r.id)"
                 >
-                  <div class="text-sm font-medium">{{ r.label }}</div>
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-sm font-medium">{{ r.label }}</span>
+                    <span
+                      v-if="r.comingSoon"
+                      class="rounded-full border border-electric-400/40 bg-white px-1.5 py-0.5 text-[10px] font-medium tracking-wider text-electric-400"
+                    >
+                      即将开放
+                    </span>
+                  </div>
                   <div class="text-[11px] text-mist-500">{{ r.hint }}</div>
                 </button>
               </div>
