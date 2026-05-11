@@ -55,6 +55,9 @@ class Settings(BaseSettings):
 
     # AIGCDesk（OpenAI 兼容 Chat Completions）
     AIGCDESK_API_KEY: str = ""
+    # 备用 key：主 key 失败（429 / 5xx / 余额不足 / 超时等）时自动重试一次，
+    # 还失败才会降级到 SoCheap。留空则跳过本步重试，直接到 SoCheap。
+    AIGCDESK_API_KEY_BACKUP: str = ""
     AIGCDESK_BASE_URL: str = "https://api.aigcdesk.com/v1"
     AIGCDESK_MODEL: str = ""
     AIGCDESK_TIMEOUT_SECONDS: float = 120.0

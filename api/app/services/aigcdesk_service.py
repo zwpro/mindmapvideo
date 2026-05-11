@@ -124,13 +124,15 @@ def build_aigcdesk_payload(req: AIGCDeskChatRequest) -> dict[str, Any]:
     return {"model": model, "messages": chat_msgs}
 
 
-def _ensure_api_key() -> str:
-    if not settings.AIGCDESK_API_KEY:
+def _ensure_api_key(api_key_override: str | None = None) -> str:
+    """显式传 api_key_override 时优先使用，便于上层用备用 key 重试。"""
+    key = (api_key_override or settings.AIGCDESK_API_KEY or "").strip()
+    if not key:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="AIGCDESK_API_KEY 未配置，请在 api/.env 中填入 AIGCDesk API Key",
         )
-    return settings.AIGCDESK_API_KEY
+    return key
 
 
 def _headers(api_key: str, *, stream: bool) -> dict[str, str]:
@@ -159,12 +161,17 @@ def _extract_output_text(content: list[Any] | None) -> str:
     return "".join(parts)
 
 
-async def aigcdesk_chat(req: AIGCDeskChatRequest) -> dict[str, Any]:
+async def aigcdesk_chat(
+    req: AIGCDeskChatRequest,
+    *,
+    api_key: str | None = None,
+) -> dict[str, Any]:
     """非流式调用 /v1/messages，返回 Anthropic 响应（dict）。
 
     在原 response 上额外补一个 `output_text` 字段方便前端直接显示。
+    传 ``api_key`` 可临时覆盖 settings.AIGCDESK_API_KEY，给上层做备用 key 重试用。
     """
-    api_key = _ensure_api_key()
+    api_key = _ensure_api_key(api_key)
     payload = build_aigcdesk_payload(req)
 
     url = f"{settings.AIGCDESK_BASE_URL.rstrip('/')}/v1/messages"
@@ -180,14 +187,18 @@ async def aigcdesk_chat(req: AIGCDeskChatRequest) -> dict[str, Any]:
     return data
 
 
-async def aigcdesk_chat_stream(req: AIGCDeskChatRequest) -> AsyncIterator[bytes]:
+async def aigcdesk_chat_stream(
+    req: AIGCDeskChatRequest,
+    *,
+    api_key: str | None = None,
+) -> AsyncIterator[bytes]:
     """流式调用 /v1/messages，按块 yield 原始 SSE 字节。
 
     Anthropic SSE 事件类型：message_start / content_block_start /
     content_block_delta / content_block_stop / message_delta / message_stop。
     本服务直接透传，前端按 Anthropic 事件协议消费即可。
     """
-    api_key = _ensure_api_key()
+    api_key = _ensure_api_key(api_key)
     # 注：按"payload 仅保留 model+messages"的约束，这里也不再注入 stream=true。
     # 上游可能因此返回非 SSE 的整段 JSON，前端流式消费时需自行兜底。
     payload = build_aigcdesk_payload(req)

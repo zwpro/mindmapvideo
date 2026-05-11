@@ -108,9 +108,9 @@ SYSTEM_PROMPT = """\
        from manim import *
        import math  # 可选
 2. 只允许 `from manim import *` 这一个 import（如果确实需要，可以再加标准库 `math`）。
-4. 视频总时长整体控制在 30~180 秒之间。
+4. 视频总时长整体控制在 30~300 秒之间。
 5. 文字一律用 `Text(...)`，**不要传 `font=` 参数**——项目会在脚本顶部自动注入 CJK 字体引导代码（注册项目自带字体并猴补 `Text.__init__`），你显式传的字体名会被覆盖。直接 `Text("中文内容")` 即可。**严禁**使用 `Tex` / `MathTex`（环境里没有 LaTeX）。
-6. 不依赖任何外部资源（图片、音频、外部字体文件等）。背景色建议设为 `self.camera.background_color = "#0F172A"`（深石板蓝，与彩色节点搭配好看）。
+6. 不依赖任何外部资源（图片、音频、外部字体文件等）。
 7. 脚本必须能直接被 `manim render -qm <file> MainScene` 跑通，不需要任何手工修改；不要使用 `self.camera.frame` 等任何 OpenGL 专属特性，我们用默认 cairo 后端渲染。
 8. **字符串字面量必须是合法 Python**。双引号字符串内部的 `"` 必须转义成 `\\"`，或者整段改用单引号；**严禁**写出 `"foo "bar" baz"` 这种裸嵌套引号。多行内容优先用三引号 `\"\"\"...\"\"\"`。最终脚本必须能通过 `compile()`，**绝不能**出现 SyntaxError。
 """
@@ -118,7 +118,7 @@ SYSTEM_PROMPT = """\
 USER_PROMPT_TEMPLATE = """\
 主题：{topic}
 
-分镜（共 {n} 条）。每条中 "title" 是简短标签，"context" 是描述该分镜内容的文字，每个分镜是一个独立的动画场景，场景里的内容可根据 context 进一步展开，形式动画各不相同，好看。
+分镜（共 {n} 条）。每条中 "title" 是简短标签，"context" 是描述该分镜内容的文字，每个分镜是一个独立的动画场景，独立展开分析，场景里的分析内容可根据 context 进一步展开，形式动画各不相同，好看。
 
 {scenes_block}
 
@@ -338,12 +338,19 @@ async def _load_project_with_scenes(project_id: str) -> tuple[str, list[dict[str
 
 
 async def _generate_manim_script(topic: str, scenes: list[dict[str, Any]]) -> str:
-    """调 AIGCDESK 生成 manim Python 源码；失败时回退 SoCheap。
+    """生成 manim Python 源码。
 
-    回退语义：
-    - 主路 AIGCDESK 抛任何异常（API error / 网络超时 / API_KEY 未配置 503 ...）都触发回退
-    - 回退 SoCheap 也失败时把两条线的错误一起 raise，方便日志定位
-    - 主路返回空 output_text 也判定为失败，走回退
+    通道链路（按顺序尝试，前一个失败才走下一个）：
+      1) AIGCDESK  — 主 key（settings.AIGCDESK_API_KEY）
+      2) AIGCDESK  — 备用 key（settings.AIGCDESK_API_KEY_BACKUP，未配置则跳过）
+      3) SoCheap   — 完全切换到 SoCheap 服务
+
+    失败定义（任一命中即视为本次通道失败，进入下一个）：
+      - 抛 AIGCDeskAPIError / SoCheapAPIError（上游 4xx/5xx）
+      - 抛任何其它 Exception（httpx 超时 / DNS / API_KEY 未配置 503 等）
+      - 返回 200 但 output_text 为空
+
+    三个通道全部失败才整体 raise RuntimeError，并把所有错误信息拼在一起便于排障。
     """
     system_prompt, user_prompt = _build_prompt(topic, scenes)
     # payload 极简策略：build 阶段只会保留 model + messages，
@@ -356,43 +363,49 @@ async def _generate_manim_script(topic: str, scenes: list[dict[str, Any]]) -> st
         ],
     )
 
-    # ---------- 主路：AIGCDESK ----------
-    aigcdesk_error: str | None = None
-    code = ""
-    try:
-        resp = await aigcdesk_service.aigcdesk_chat(req)
-        code = str(resp.get("output_text") or "").strip()
-        if not code:
-            aigcdesk_error = "AIGCDESK 返回空内容"
-    except AIGCDeskAPIError as exc:
-        aigcdesk_error = f"status={exc.status_code} body={exc.body[:300]}"
-    except Exception as exc:  # noqa: BLE001 — 任何异常都回退，包括 httpx 超时 / 503 等
-        aigcdesk_error = f"{type(exc).__name__}: {exc}"
-
-    # ---------- 回退路：SoCheap ----------
-    if aigcdesk_error is not None:
-        logger.warning("AIGCDESK 失败，回退到 SoCheap：%s", aigcdesk_error)
-        try:
-            resp = await socheap_service.socheap_chat(req)
-        except SoCheapAPIError as exc:
-            raise RuntimeError(
-                f"AIGCDESK 与 SoCheap 双双失败。\n"
-                f"  AIGCDESK: {aigcdesk_error}\n"
-                f"  SoCheap : status={exc.status_code} body={exc.body[:300]}"
-            ) from exc
-        except Exception as exc:  # noqa: BLE001
-            raise RuntimeError(
-                f"AIGCDESK 与 SoCheap 双双失败。\n"
-                f"  AIGCDESK: {aigcdesk_error}\n"
-                f"  SoCheap : {type(exc).__name__}: {exc}"
-            ) from exc
-        code = str(resp.get("output_text") or "").strip()
-        if not code:
-            raise RuntimeError(
-                f"AIGCDESK 与 SoCheap 都返回空内容。\n"
-                f"  AIGCDESK: {aigcdesk_error}\n"
-                f"  SoCheap : 返回空 content"
+    # 用 lambda 包成「按需创建的协程工厂」，每次 retry 都生成新的 coroutine，
+    # 避免「same coroutine awaited twice」。
+    attempts: list[tuple[str, Any]] = [
+        ("AIGCDESK[主key]", lambda: aigcdesk_service.aigcdesk_chat(req)),
+    ]
+    backup_key = settings.AIGCDESK_API_KEY_BACKUP.strip()
+    # 主备 key 相同时没必要重试，省一次徒劳的远端调用
+    if backup_key and backup_key != settings.AIGCDESK_API_KEY.strip():
+        attempts.append(
+            (
+                "AIGCDESK[备用key]",
+                lambda: aigcdesk_service.aigcdesk_chat(req, api_key=backup_key),
             )
+        )
+    attempts.append(("SoCheap", lambda: socheap_service.socheap_chat(req)))
+
+    errors: list[str] = []
+    code = ""
+    for label, caller in attempts:
+        try:
+            resp = await caller()
+        except (AIGCDeskAPIError, SoCheapAPIError) as exc:
+            errors.append(f"{label}: status={exc.status_code} body={exc.body[:300]}")
+            logger.warning("%s 调用失败：%s", label, errors[-1])
+            continue
+        except Exception as exc:  # noqa: BLE001 — 任何异常都视为本通道失败，走下一个
+            errors.append(f"{label}: {type(exc).__name__}: {exc}")
+            logger.warning("%s 调用失败：%s", label, errors[-1])
+            continue
+
+        code = str(resp.get("output_text") or "").strip()
+        if not code:
+            errors.append(f"{label}: 返回空 output_text")
+            logger.warning("%s 调用失败：返回空 output_text", label)
+            continue
+
+        logger.info("LLM 命中 %s（前置失败 %d 次）", label, len(errors))
+        break
+
+    if not code:
+        raise RuntimeError(
+            "LLM 全部通道都失败：\n  " + "\n  ".join(errors)
+        )
     code = _strip_code_fences(code)
     if "class MainScene" not in code:
         raise RuntimeError("LLM 输出不包含 MainScene，疑似生成失败")
