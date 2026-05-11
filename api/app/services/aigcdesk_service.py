@@ -78,7 +78,15 @@ def _message_to_anthropic(msg: ChatMessage) -> dict[str, Any]:
 
 
 def build_aigcdesk_payload(req: AIGCDeskChatRequest) -> dict[str, Any]:
-    """AIGCDeskChatRequest → Anthropic /v1/messages 请求体。"""
+    """AIGCDeskChatRequest → AIGCDESK /v1/messages 请求体（极简版）。
+
+    AIGCDESK 中转对绝大多数可选字段都校验严格（temperature 已弃用、stream 触发
+    SSE 路由、max_tokens 在部分模型上语义不一致等），按用户要求 payload 仅保留
+    最小必须字段：``model`` + ``messages``。
+
+    为不丢失语义，prompt 列表里的 system / developer 消息会被前置拼接到第一条
+    user 消息内容里（带 ``[SYSTEM]`` 标记），而不是作为顶层 ``system`` 字段。
+    """
     model = req.model or settings.AIGCDESK_MODEL
     if not model:
         raise HTTPException(
@@ -86,7 +94,6 @@ def build_aigcdesk_payload(req: AIGCDeskChatRequest) -> dict[str, Any]:
             detail="未指定 model，且后端 AIGCDESK_MODEL 也未配置默认值",
         )
 
-    # 拆分 system / 对话消息
     system_parts: list[str] = []
     chat_msgs: list[dict[str, Any]] = []
     for m in req.messages:
@@ -103,25 +110,18 @@ def build_aigcdesk_payload(req: AIGCDeskChatRequest) -> dict[str, Any]:
             detail="messages 中至少需要一条 user/assistant 消息",
         )
 
-    payload: dict[str, Any] = {
-        "model": model,
-        "messages": chat_msgs,
-        "max_tokens": req.max_tokens or DEFAULT_MAX_TOKENS,
-        "stream": req.stream,
-    }
+    # 把 system 文本内联到第一条 user 消息前，避免直接丢失约束
     if system_parts:
-        payload["system"] = "\n\n".join(system_parts)
-    if req.temperature is not None:
-        payload["temperature"] = req.temperature
-    if req.top_p is not None:
-        payload["top_p"] = req.top_p
-    if req.stop_sequences:
-        payload["stop_sequences"] = req.stop_sequences
+        sys_text = "[SYSTEM]\n" + "\n\n".join(system_parts) + "\n\n[USER]\n"
+        first = chat_msgs[0]
+        if first["role"] == "user":
+            content = first["content"]
+            if isinstance(content, str):
+                first["content"] = sys_text + content
+            elif isinstance(content, list):
+                first["content"] = [{"type": "text", "text": sys_text}, *content]
 
-    if req.extra:
-        for k, v in req.extra.items():
-            payload.setdefault(k, v)
-    return payload
+    return {"model": model, "messages": chat_msgs}
 
 
 def _ensure_api_key() -> str:
@@ -166,7 +166,6 @@ async def aigcdesk_chat(req: AIGCDeskChatRequest) -> dict[str, Any]:
     """
     api_key = _ensure_api_key()
     payload = build_aigcdesk_payload(req)
-    payload["stream"] = False
 
     url = f"{settings.AIGCDESK_BASE_URL.rstrip('/')}/v1/messages"
     timeout = httpx.Timeout(settings.AIGCDESK_TIMEOUT_SECONDS, connect=15.0)
@@ -189,8 +188,9 @@ async def aigcdesk_chat_stream(req: AIGCDeskChatRequest) -> AsyncIterator[bytes]
     本服务直接透传，前端按 Anthropic 事件协议消费即可。
     """
     api_key = _ensure_api_key()
+    # 注：按"payload 仅保留 model+messages"的约束，这里也不再注入 stream=true。
+    # 上游可能因此返回非 SSE 的整段 JSON，前端流式消费时需自行兜底。
     payload = build_aigcdesk_payload(req)
-    payload["stream"] = True
 
     url = f"{settings.AIGCDESK_BASE_URL.rstrip('/')}/v1/messages"
     timeout = httpx.Timeout(settings.AIGCDESK_TIMEOUT_SECONDS, connect=15.0)

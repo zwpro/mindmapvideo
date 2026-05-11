@@ -8,7 +8,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, Float, ForeignKey, String, Text, func
+from sqlalchemy import DateTime, ForeignKey, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -26,7 +26,6 @@ class VideoTaskORM(Base):
     )
 
     stage: Mapped[str] = mapped_column(String(32), default="voice", nullable=False, index=True)
-    progress: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     video_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
 

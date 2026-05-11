@@ -44,7 +44,6 @@ class VideoTask(BaseModel):
     id: str
     projectId: str
     stage: GenerationStage
-    progress: float = Field(..., ge=0, le=1)
     startedAt: str
     finishedAt: str | None = None
     error: str | None = None

@@ -1,8 +1,13 @@
-"""视频任务服务（SQLAlchemy 异步实现，mock 一次性完成态）。
+"""视频任务服务。
 
-当前接收任务后立即写入 video_tasks 与 video_details 两张表，并把
-project.task_id / video_id / status 同步落库；后续接 Celery + FFmpeg 时，
-create_task 改为入队，由 worker 多次更新 video_tasks.stage / progress 即可。
+create_task 流程：
+1. 同步在请求 session 里写一条 stage="voice" 的 VideoTaskORM 入库；
+2. fire-and-forget 启动后台 video_pipeline.run_pipeline() 异步管线
+   （LLM 生成 manim 脚本 → manim 渲染 → 抽缩略图 → 写 video_details）；
+3. HTTP 立即返回 task DTO，前端通过轮询 /videos/tasks/{id} 拿到阶段切换。
+
+进程重启会丢失正在跑的后台 pipeline（demo 限制），后续接 Celery 时把第 2 步
+改成 .delay() / .send_task() 即可，DB 端的状态机保持不变。
 """
 
 from __future__ import annotations
@@ -15,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import ProjectORM, VideoDetailORM, VideoTaskORM
 from app.schemas.video import VideoDetail, VideoTask
+from app.services import video_pipeline
 
 
 def _orm_to_task(orm: VideoTaskORM) -> VideoTask:
@@ -22,7 +28,6 @@ def _orm_to_task(orm: VideoTaskORM) -> VideoTask:
         id=orm.id,
         projectId=orm.project_id,
         stage=orm.stage,  # type: ignore[arg-type]
-        progress=orm.progress,
         startedAt=orm.started_at.isoformat(),
         finishedAt=orm.finished_at.isoformat() if orm.finished_at else None,
         error=orm.error,
@@ -46,7 +51,11 @@ def _orm_to_video(orm: VideoDetailORM) -> VideoDetail:
 
 
 async def create_task(db: AsyncSession, project_id: str) -> VideoTask:
-    """创建任务并立即合成出视频（mock）。"""
+    """创建任务：写一条初始 task 入库立即返回，真正合成在后台异步进行。
+
+    - VideoDetailORM 不在这里写，等 pipeline 跑到 compose 阶段才会创建。
+    - 任务最终态（done/failed）由 pipeline 自己更新。
+    """
     project_stmt = select(ProjectORM).where(ProjectORM.id == project_id)
     project = (await db.execute(project_stmt)).scalar_one_or_none()
     if project is None:
@@ -59,38 +68,26 @@ async def create_task(db: AsyncSession, project_id: str) -> VideoTask:
     task_orm = VideoTaskORM(
         id=task_id,
         project_id=project_id,
-        stage="done",
-        progress=1.0,
+        stage="voice",
         error=None,
         video_id=video_id,
         started_at=now,
-        finished_at=now,
+        finished_at=None,
     )
-    video_orm = VideoDetailORM(
-        id=video_id,
-        project_id=project_id,
-        task_id=task_id,
-        url=f"/media/{video_id}.mp4",
-        thumbnail_url=f"/media/{video_id}.jpg",
-        duration=120.0,
-        resolution="720p",
-        ratio="16:9",
-        file_size=15 * 1024 * 1024,
-        created_at=now,
-    )
-
-    # video_details.task_id 外键指向 video_tasks，需要保证 task 先落库；
-    # 这里用一次显式 flush 控制插入顺序，避免 UoW 把 video_details 排在前面。
     db.add(task_orm)
-    await db.flush()
-    db.add(video_orm)
 
     project.task_id = task_id
     project.video_id = video_id
-    project.status = "completed"
+    project.status = "generating"
 
     await db.commit()
     await db.refresh(task_orm)
+
+    # 调度后台流水线（fire-and-forget）。必须在 commit 之后再调度，
+    # 否则后台任务可能比 task 行先抵达 DB，导致 _update_task 找不到记录。
+    video_pipeline.schedule_pipeline(
+        task_id=task_id, project_id=project_id, video_id=video_id
+    )
     return _orm_to_task(task_orm)
 
 

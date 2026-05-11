@@ -63,7 +63,6 @@ export interface VideoTask {
   id: string
   projectId: string
   stage: GenerationStage
-  progress: number
   startedAt: string
   finishedAt?: string
   error?: string

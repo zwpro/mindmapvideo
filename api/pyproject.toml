@@ -23,6 +23,8 @@ dependencies = [
     "python-jose[cryptography]>=3.3.0",
     "passlib[bcrypt]>=1.7.4",
     "nanoid>=2.0.0",
+    # 视频合成（需要系统额外装 ffmpeg；中文字体如 Microsoft YaHei / Source Han Sans）
+    "manim>=0.18.0",
 ]
 
 [project.optional-dependencies]

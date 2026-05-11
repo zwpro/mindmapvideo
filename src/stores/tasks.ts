@@ -26,11 +26,10 @@ export const useTaskStore = defineStore('tasks', {
     upsert(task: VideoTask) {
       this.tasks[task.id] = { ...task }
     },
-    setProgress(id: string, stage: GenerationStage, progress: number) {
+    setStage(id: string, stage: GenerationStage) {
       const task = this.tasks[id]
       if (!task) return
       task.stage = stage
-      task.progress = progress
       if (stage === 'done' || stage === 'failed') {
         task.finishedAt = new Date().toISOString()
       }
