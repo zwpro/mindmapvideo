@@ -73,6 +73,12 @@ class Settings(BaseSettings):
     MEDIA_ROOT: str = "./media"
     MEDIA_BASE_URL: str = "http://localhost:8000/media"
 
+    # manim 渲染子进程的硬超时（秒）。
+    # 经验值：720p30 下复杂思维导图脚本（8+ 场景，几十个 self.play）通常耗时
+    # 5~15 分钟；30s 短脚本约 1 分钟。默认放到 30 分钟，避免正常脚本被误杀。
+    # 真正卡死的脚本（死循环等）仍会被强制 kill。
+    MANIM_TIMEOUT_SECONDS: int = 1800
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

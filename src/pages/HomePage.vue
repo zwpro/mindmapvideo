@@ -40,6 +40,10 @@ const useSuggestion = (s: string) => {
   topic.value = s
 }
 
+const openCase = (id: string) => {
+  router.push({ name: 'preview', params: { videoId: id } })
+}
+
 const steps = [
   {
     icon: Brain,
@@ -60,22 +64,25 @@ const steps = [
 
 const cases = [
   {
-    title: '《量子计算入门》',
-    duration: '02:48',
-    nodes: 14,
-    accent: 'from-electric-400/25 to-transparent',
+    title: '不要干预他人命运',
+    duration: '01:05',
+    nodes: 6,
+    id: 'tCNuGqNI36ml',
+    cover: 'https://mindmap-api.vuseai.com/media/thumbnails/tCNuGqNI36ml.jpg',
   },
   {
-    title: '《唐诗鉴赏：王维》',
-    duration: '03:32',
-    nodes: 18,
-    accent: 'from-ember-400/25 to-transparent',
+    title: '成大事前，先研究自己',
+    duration: '01:13',
+    nodes: 7,
+    id: 'vqdEXpZnp0IC',
+    cover: 'https://mindmap-api.vuseai.com/media/thumbnails/vqdEXpZnp0IC.jpg',
   },
   {
-    title: '《产品经理面试 30 题》',
-    duration: '04:15',
-    nodes: 22,
-    accent: 'from-electric-400/20 to-ember-400/15',
+    title: '福祸相依，否极泰来',
+    duration: '01:10',
+    nodes: 6,
+    id: 'UPpedtL-ujgM',
+    cover: 'https://mindmap-api.vuseai.com/media/thumbnails/UPpedtL-ujgM.jpg',
   },
 ]
 
@@ -104,7 +111,7 @@ const features = [
       <div class="absolute inset-0 bg-hero-glow pointer-events-none" />
       <div class="absolute inset-0 grid-bg opacity-40 pointer-events-none" />
 
-      <div class="container-page relative pt-20 pb-24 lg:pt-28 lg:pb-32">
+      <div class="container-page relative pt-12 pb-14 lg:pt-16 lg:pb-20">
         <div class="mx-auto max-w-3xl text-center animate-fade-up">
           <AppBadge tone="electric" class="mb-6 inline-flex items-center gap-1.5">
             <Sparkles class="h-3.5 w-3.5" />
@@ -161,9 +168,9 @@ const features = [
       </div>
     </section>
 
-    <section class="container-page py-16 lg:py-24">
-      <div class="text-center mb-14">
-        <h2 class="font-display text-h2 font-semibold text-moon-50">三步，生成你的第一支视频</h2>
+    <section class="container-page py-10 lg:py-14">
+      <div class="text-center mb-10">
+        <h2 class="font-display text-h2 font-semibold text-moon-50">三步成片，一句话变成科普思维导图视频</h2>
         <p class="mt-3 text-mist-400">从想法到成片，全流程由 AI 协助完成</p>
       </div>
 
@@ -188,8 +195,8 @@ const features = [
       </div>
     </section>
 
-    <section class="container-page py-16 lg:py-24">
-      <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-10">
+    <section class="container-page py-10 lg:py-14">
+      <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-8">
         <div>
           <AppBadge tone="ember" class="mb-3">案例展示</AppBadge>
           <h2 class="font-display text-h2 font-semibold text-moon-50">看看别人是怎么用的</h2>
@@ -201,17 +208,20 @@ const features = [
 
       <div class="grid gap-6 md:grid-cols-3">
         <AppCard
-          v-for="(c, i) in cases"
+          v-for="c in cases"
           :key="c.title"
-          class="overflow-hidden p-0 group cursor-pointer hover:-translate-y-1 transition"
+          :padded="false"
+          class="overflow-hidden group cursor-pointer hover:-translate-y-1 transition"
+          @click="openCase(c.id)"
         >
           <div
-            class="relative h-44 bg-gradient-to-br border-b border-graphite-700 grid-bg"
-            :class="c.accent"
+            class="relative h-44 bg-cover bg-center border-b border-graphite-700"
+            :style="{ backgroundImage: `url(${c.cover})` }"
           >
+            <div class="absolute inset-0 bg-zinc-900/30 group-hover:bg-zinc-900/10 transition" />
             <div class="absolute inset-0 flex items-center justify-center">
               <PlayCircle
-                class="h-14 w-14 text-zinc-700/70 group-hover:text-electric-400 group-hover:scale-110 transition"
+                class="h-14 w-14 text-white/80 group-hover:text-electric-400 group-hover:scale-110 transition drop-shadow-lg"
               />
             </div>
             <span class="absolute bottom-3 right-3 text-xs font-mono text-white bg-zinc-900/75 px-2 py-1 rounded">
@@ -226,7 +236,7 @@ const features = [
       </div>
     </section>
 
-    <section class="container-page py-16 lg:py-24">
+    <section class="container-page py-10 lg:py-14">
       <div class="grid gap-6 md:grid-cols-3">
         <div
           v-for="f in features"
@@ -242,7 +252,7 @@ const features = [
       </div>
     </section>
 
-    <section class="container-page pb-24">
+    <section class="container-page pt-10 pb-16 lg:pt-14 lg:pb-20">
       <div class="rounded-3xl border border-electric-400/20 bg-gradient-to-br from-indigo-50 via-white to-orange-50 p-10 lg:p-14 text-center relative overflow-hidden shadow-soft">
         <div class="absolute inset-0 bg-hero-glow opacity-60 pointer-events-none" />
         <div class="relative">

@@ -14,6 +14,7 @@ import {
   Plus,
   Sparkles,
 } from 'lucide-vue-next'
+import type { Component } from 'vue'
 import PageShell from '@/components/layout/PageShell.vue'
 import AppInput from '@/components/ui/AppInput.vue'
 import AppButton from '@/components/ui/AppButton.vue'
@@ -103,8 +104,14 @@ const openProject = (p: Project) => {
   }
 }
 
-const editProject = (p: Project) => {
-  router.push({ name: 'outline', params: { projectId: p.id } })
+// 合并后的主操作：completed → 观看（去预览页），draft/failed → 编辑（去大纲页）
+// generating 时不暴露此入口，避免在生成过程中改动大纲导致状态错乱
+const primaryAction = (
+  p: Project,
+): { label: string; icon: Component } | null => {
+  if (p.status === 'completed') return { label: '观看', icon: Eye }
+  if (p.status === 'generating') return null
+  return { label: '编辑', icon: Pencil }
 }
 
 const removeProject = async (p: Project) => {
@@ -286,19 +293,16 @@ const removeProject = async (p: Project) => {
               class="absolute inset-x-3 bottom-3 flex translate-y-2 items-center gap-2 opacity-0 transition-all group-hover:translate-y-0 group-hover:opacity-100"
             >
               <AppButton
+                v-if="primaryAction(p)"
                 variant="primary"
                 size="sm"
                 @click.stop="openProject(p)"
               >
-                <Eye class="h-3.5 w-3.5" />
-                {{ p.status === 'completed' ? '观看' : '继续' }}
-              </AppButton>
-              <AppButton
-                variant="secondary"
-                size="sm"
-                @click.stop="editProject(p)"
-              >
-                <Pencil class="h-3.5 w-3.5" /> 编辑
+                <component
+                  :is="primaryAction(p)!.icon"
+                  class="h-3.5 w-3.5"
+                />
+                {{ primaryAction(p)!.label }}
               </AppButton>
               <AppButton
                 variant="ghost"

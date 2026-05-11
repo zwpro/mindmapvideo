@@ -46,7 +46,6 @@ from app.services.socheap_service import SoCheapAPIError
 
 logger = logging.getLogger(__name__)
 
-MANIM_TIMEOUT_SECONDS = 300  # manim 渲染超时上限
 SCENE_CLASS_NAME = "MainScene"
 DEFAULT_QUALITY_FLAG = "-qm"  # 720p30
 DEFAULT_QUALITY_DIR = "720p30"
@@ -459,6 +458,7 @@ async def _run_manim(script_path: Path, work_dir: Path) -> Path:
     # animation 不会推进。改成把所有输出重定向到 work_dir/manim.log，
     # 跑完之后自己读 tail 即可，无 PIPE 就无死锁。
     log_path = work_dir / "manim.log"
+    timeout_seconds = settings.MANIM_TIMEOUT_SECONDS
 
     def _run() -> int:
         with log_path.open("wb") as logf:
@@ -468,7 +468,7 @@ async def _run_manim(script_path: Path, work_dir: Path) -> Path:
                 stdout=logf,
                 stderr=subprocess.STDOUT,
                 stdin=subprocess.DEVNULL,
-                timeout=MANIM_TIMEOUT_SECONDS,
+                timeout=timeout_seconds,
                 check=False,
                 env=_child_env(),
                 creationflags=_CREATIONFLAGS,
@@ -477,8 +477,16 @@ async def _run_manim(script_path: Path, work_dir: Path) -> Path:
     try:
         returncode = await asyncio.to_thread(_run)
     except subprocess.TimeoutExpired as exc:
+        # 把已经写到 manim.log 的 tail 也附上，便于判断是"卡在某一帧"还是"全程慢渲染"
+        log_tail = (
+            log_path.read_text(encoding="utf-8", errors="replace")[-800:]
+            if log_path.is_file()
+            else ""
+        )
         raise RuntimeError(
-            f"manim 渲染超时（>{MANIM_TIMEOUT_SECONDS}s），已强制终止"
+            f"manim 渲染超时（>{timeout_seconds}s），已强制终止。"
+            f"如需放宽请调大 .env 里的 MANIM_TIMEOUT_SECONDS。"
+            f"\nlog(tail):\n{log_tail}"
         ) from exc
 
     log_text = (
