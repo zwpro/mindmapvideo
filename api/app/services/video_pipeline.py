@@ -95,9 +95,20 @@ SYSTEM_PROMPT = """\
 你是 manim Community Edition专家。你的任务是把给定的分镜大纲生成一份完整、可直接运行的 Python 脚本，做成**思维导图 / 流程图**风格的动画。
 
 严格要求：
-1. 输出**单一** Python 文件源码，纯文本。不要加 markdown 围栏、不要任何解释，代码前后不要写注释。
+1. 输出**单一** Python 文件源码，纯文本。**文件第 1 行必须是 `from manim import *`**（或其它合法的 `import` 语句）。
+   - 不要加 markdown 围栏（` ```python `）。
+   - 不要在代码前后写任何说明、分析、大纲、Step 1/Step 2、bullet/numbered list 等纯文本。
+   - 不要把分镜内容以中文形式直接写在模块顶层当文档说明，那样会变成裸的中文字符让 Python 解析失败。
+   - 反例（**严禁出现这种开头**）：
+       1. Topic introduction
+       2. Origin of concepts - Show sources from 《老子》and《周易》
+       ```python
+       from manim import *
+   - 正例（必须直接这样开头）：
+       from manim import *
+       import math  # 可选
 2. 只允许 `from manim import *` 这一个 import（如果确实需要，可以再加标准库 `math`）。
-4. 视频总时长整体控制在 20~180 秒之间。
+4. 视频总时长整体控制在 30~180 秒之间。
 5. 文字一律用 `Text(...)`，**不要传 `font=` 参数**——项目会在脚本顶部自动注入 CJK 字体引导代码（注册项目自带字体并猴补 `Text.__init__`），你显式传的字体名会被覆盖。直接 `Text("中文内容")` 即可。**严禁**使用 `Tex` / `MathTex`（环境里没有 LaTeX）。
 6. 不依赖任何外部资源（图片、音频、外部字体文件等）。背景色建议设为 `self.camera.background_color = "#0F172A"`（深石板蓝，与彩色节点搭配好看）。
 7. 脚本必须能直接被 `manim render -qm <file> MainScene` 跑通，不需要任何手工修改；不要使用 `self.camera.frame` 等任何 OpenGL 专属特性，我们用默认 cairo 后端渲染。
@@ -128,6 +139,16 @@ def _build_prompt(topic: str, scenes: list[dict[str, Any]]) -> tuple[str, str]:
 
 
 _CODE_FENCE_RE = re.compile(r"^```[a-zA-Z]*\s*\n?|\n?```\s*$")
+# 匹配第一个 ```python / ```py / ``` 代码围栏内的内容（DOTALL 让 . 吃换行）
+_FENCED_BLOCK_RE = re.compile(
+    r"```(?:python|py)?[ \t]*\r?\n(.*?)\r?\n[ \t]*```",
+    re.DOTALL | re.IGNORECASE,
+)
+# 兜底：从第一个 import / from xxx import 行起截断，丢掉 LLM 写在前面的说明性文字
+_FIRST_IMPORT_RE = re.compile(
+    r"^[ \t]*(?:from[ \t]+\w[\w.]*[ \t]+import|import[ \t]+\w)",
+    re.MULTILINE,
+)
 
 
 def _build_font_prelude() -> str:
@@ -202,14 +223,31 @@ if CJK_FONT:
 
 
 def _strip_code_fences(text: str) -> str:
-    """去掉 LLM 可能加在外层的 ```python ... ``` 代码围栏。"""
+    """尽力把 LLM 输出剥成纯 Python 源码。
+
+    支持几种常见的脏输出：
+      1) 整段被 ```python ... ``` 包住                       → 取 fence 内容
+      2) 代码块前后还有说明 / markdown 大纲（claude 老毛病）  → 取第一段 fence
+      3) 完全没 fence 但前面塞了几行解释                      → 从第一个 import 行起截断
+      4) 干净的 Python                                       → 原样返回
+    """
     text = text.strip()
-    if text.startswith("```"):
-        # 去开头围栏
-        text = re.sub(r"^```[a-zA-Z]*\s*\n", "", text)
-    if text.endswith("```"):
-        text = re.sub(r"\n?```\s*$", "", text)
-    return text.strip()
+    if not text:
+        return text
+
+    # Case 1+2: 优先抽 fenced block，能抽到就直接拿
+    fence = _FENCED_BLOCK_RE.search(text)
+    if fence:
+        return fence.group(1).strip()
+
+    # Case 3: 没有 fence，但开头那段不是 Python → 从第一个 import 行起截断
+    if not text.startswith(("from ", "import ", "#", '"""', "'''")):
+        m = _FIRST_IMPORT_RE.search(text)
+        if m:
+            return text[m.start():].strip()
+
+    # Case 4: 已经像 Python 了，原样返回
+    return text
 
 
 # ---------- DB 进度更新 ----------
