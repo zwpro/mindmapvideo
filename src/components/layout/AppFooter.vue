@@ -50,6 +50,16 @@ import { Sparkles, Github, Twitter, Send } from 'lucide-vue-next'
         class="mx-auto flex w-full max-w-[1280px] flex-col items-center justify-between gap-3 px-6 py-5 text-xs text-mist-500 md:flex-row lg:px-10"
       >
         <p>© {{ new Date().getFullYear() }} MindMap Video. All rights reserved.</p>
+        <p class="flex items-center gap-1">
+          <span>Powered by</span>
+          <a
+            href="https://www.trae.cn/"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="font-medium text-mist-400 hover:text-electric-400 transition-colors"
+            >Trae Solo</a
+          >
+        </p>
         <div class="flex items-center gap-3">
           <a class="hover:text-electric-400" href="#" aria-label="GitHub">
             <Github class="h-4 w-4" />

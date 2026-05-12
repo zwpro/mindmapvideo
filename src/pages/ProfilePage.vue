@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { Save, Trash2, Bell, BellOff, Database } from 'lucide-vue-next'
+import { Save, Bell, BellOff } from 'lucide-vue-next'
 import PageShell from '@/components/layout/PageShell.vue'
 import AppCard from '@/components/ui/AppCard.vue'
 import AppButton from '@/components/ui/AppButton.vue'
@@ -63,14 +63,6 @@ const stats = computed(() => ({
   videos: Object.keys(taskStore.videos).length,
   notifications: userStore.notifications.length,
 }))
-
-const clearProjects = async () => {
-  if (!confirm('确定要清空所有项目数据吗？此操作不可撤销。')) return
-  const list = [...projectStore.projects]
-  for (const p of list) {
-    await projectStore.remove(p.id).catch(() => undefined)
-  }
-}
 
 const clearNotifications = async () => {
   await userStore.markAllRead().catch(() => undefined)
@@ -185,20 +177,6 @@ const markAllRead = async () => {
             </div>
           </li>
         </ul>
-      </AppCard>
-
-      <AppCard class="p-6 border-danger/20">
-        <div class="flex items-center gap-2 mb-3">
-          <Database class="h-4 w-4 text-danger" />
-          <h2 class="font-display text-lg font-semibold text-moon-50">数据管理</h2>
-        </div>
-        <p class="text-sm text-mist-400 mb-5">
-          所有数据存储在浏览器本地。清空后不可恢复，请谨慎操作。
-        </p>
-        <AppButton variant="danger" @click="clearProjects">
-          <Trash2 class="h-4 w-4" />
-          清空所有项目
-        </AppButton>
       </AppCard>
     </div>
   </PageShell>

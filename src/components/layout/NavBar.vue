@@ -19,9 +19,17 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
 const route = useRoute()
 const user = useUserStore()
 
-const links = [
+type NavLink = {
+  to?: string
+  href?: string
+  label: string
+  external?: boolean
+}
+
+const links: NavLink[] = [
   { to: '/', label: '首页' },
   { to: '/dashboard', label: '工作台' },
+  { href: 'https://www.trae.cn/', label: 'Trae Solo', external: true },
 ]
 
 const headerClass = computed(() =>
@@ -58,20 +66,29 @@ const headerClass = computed(() =>
       </RouterLink>
 
       <nav class="hidden items-center gap-1 md:flex">
-        <RouterLink
-          v-for="link in links"
-          :key="link.to"
-          :to="link.to"
-          :class="
-            cn(
-              'rounded-md px-3 py-1.5 text-sm transition-colors',
-              route.path === link.to
-                ? 'text-electric-400'
-                : 'text-mist-400 hover:text-moon-50',
-            )
-          "
-          >{{ link.label }}</RouterLink
-        >
+        <template v-for="link in links" :key="link.label">
+          <a
+            v-if="link.external"
+            :href="link.href"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="rounded-md px-3 py-1.5 text-sm text-mist-400 transition-colors hover:text-moon-50"
+            >{{ link.label }}</a
+          >
+          <RouterLink
+            v-else
+            :to="link.to!"
+            :class="
+              cn(
+                'rounded-md px-3 py-1.5 text-sm transition-colors',
+                route.path === link.to
+                  ? 'text-electric-400'
+                  : 'text-mist-400 hover:text-moon-50',
+              )
+            "
+            >{{ link.label }}</RouterLink
+          >
+        </template>
       </nav>
 
       <div class="flex items-center gap-3">

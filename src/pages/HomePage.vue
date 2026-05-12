@@ -64,18 +64,18 @@ const steps = [
 
 const cases = [
   {
-    title: '不要干预他人命运',
-    duration: '01:05',
-    nodes: 6,
-    id: 'tCNuGqNI36ml',
-    cover: 'https://mindmap-api.vuseai.com/media/thumbnails/tCNuGqNI36ml.jpg',
-  },
-  {
     title: '成大事前，先研究自己',
     duration: '01:13',
     nodes: 7,
     id: 'vqdEXpZnp0IC',
     cover: 'https://mindmap-api.vuseai.com/media/thumbnails/vqdEXpZnp0IC.jpg',
+  },
+  {
+    title: '未来已来：AI 正在改变一切',
+    duration: '00:59',
+    nodes: 6,
+    id: '8n8QpAmMR3Rx',
+    cover: 'https://mindmap-api.vuseai.com/media/thumbnails/8n8QpAmMR3Rx.jpg',
   },
   {
     title: '福祸相依，否极泰来',
@@ -169,11 +169,6 @@ const features = [
     </section>
 
     <section class="container-page py-10 lg:py-14">
-      <div class="text-center mb-10">
-        <h2 class="font-display text-h2 font-semibold text-moon-50">三步成片，一句话变成科普思维导图视频</h2>
-        <p class="mt-3 text-mist-400">从想法到成片，全流程由 AI 协助完成</p>
-      </div>
-
       <div class="grid gap-6 md:grid-cols-3">
         <AppCard
           v-for="(step, idx) in steps"
@@ -230,7 +225,7 @@ const features = [
           </div>
           <div class="p-5">
             <h3 class="font-display text-lg font-semibold text-moon-50">{{ c.title }}</h3>
-            <p class="mt-2 text-xs text-mist-400">{{ c.nodes }} 个分镜 · 教学模板</p>
+            <p class="mt-2 text-xs text-mist-400">{{ c.nodes }} 个分镜</p>
           </div>
         </AppCard>
       </div>
